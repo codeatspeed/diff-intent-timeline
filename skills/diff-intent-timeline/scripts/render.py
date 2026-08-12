@@ -117,6 +117,14 @@ padding:2px 7px;border-radius:5px;background:var(--del-bg);color:var(--del)}
 .risk-item a[href*="concept"] .risk-badge{background:var(--del-bg)}
 .risk-why{color:var(--muted);font-size:12.5px}
 @media print{.risks{display:none}}
+svg.dag{display:block;width:100%;max-width:1100px;height:auto;margin:0 0 26px;
+background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.dag-edge{stroke:var(--muted);stroke-width:1.5}
+#dag-arrow path{fill:var(--muted)}
+.dag-node rect{fill:var(--panel2);stroke:var(--line);stroke-width:1}
+.dag-node:hover rect{stroke:var(--accent)}
+.dag-num{fill:var(--accent);font:700 12px/1 ui-monospace,monospace}
+.dag-name{fill:var(--ink);font:600 12.5px/1 "Inter Variable","Inter",sans-serif}
 .concept{background:var(--panel);border:1px solid var(--line);border-radius:16px;margin:0 0 30px;
 overflow:hidden;box-shadow:var(--shadow);scroll-margin-top:96px}
 .c-head{display:flex;gap:16px;padding:18px 22px 0;align-items:flex-start}
@@ -539,6 +547,66 @@ def render_hunk(chunk, want_hl, open_=False):
             f'</summary><div class="diff">{rows}</div></details>')
 
 
+def render_dag(concepts):
+    """Layered dependency DAG as inline SVG (stdlib only). Columns are the
+    longest-path depth from root concepts; edges always run left -> right.
+    Returns '' when there are fewer than 2 concepts (nothing to map)."""
+    if len(concepts) < 2:
+        return ""
+    by_id = {c["id"]: c for c in concepts}
+    deps = {c["id"]: [d for d in (c.get("depends_on") or [])
+                      if d in by_id and d != c["id"]] for c in concepts}
+    memo, visiting = {}, set()
+
+    def depth(cid):
+        if cid in memo:
+            return memo[cid]
+        if cid in visiting:  # depends_on cycle (agent-authored): treat as root
+            return 0
+        visiting.add(cid)
+        memo[cid] = 0 if not deps[cid] else 1 + max((depth(d) for d in deps[cid]), default=0)
+        visiting.discard(cid)
+        return memo[cid]
+
+    cols = {}
+    for c in concepts:
+        cols.setdefault(depth(c["id"]), []).append(c)
+    for col in cols:
+        cols[col].sort(key=lambda c: (min((deps[c["id"]] or [0])), c["id"]))
+    NW, NH, GX, GY, CX = 180, 34, 22, 16, 70  # node w/h, gaps, column gap
+    pos, col_h = {}, {}
+    for col in sorted(cols):
+        yy = GY
+        for c in cols[col]:
+            pos[c["id"]] = (GX + col * (NW + CX), yy)
+            yy += NH + GY
+        col_h[col] = yy
+    width = GX * 2 + max(cols) * (NW + CX) + NW
+    height = max(col_h.values())
+    parts = [f'<svg class="dag" viewBox="0 0 {width} {height}" '
+             f'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Concept dependency map">']
+    parts.append('<defs><marker id="dag-arrow" viewBox="0 0 10 10" refX="9" refY="5" '
+                 'markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
+                 '<path d="M0,0 L10,5 L0,10 z"/></marker></defs>')
+    for c in concepts:
+        for d in deps[c["id"]]:
+            x1, y1 = pos[d][0] + NW, pos[d][1] + NH / 2
+            x2, y2 = pos[c["id"]][0], pos[c["id"]][1] + NH / 2
+            parts.append(f'<line class="dag-edge" x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" '
+                         f'marker-end="url(#dag-arrow)"/>')
+    for c in concepts:
+        x, y = pos[c["id"]]
+        name = esc((c.get("name") or "")[:24])
+        parts.append(
+            f'<a href="#concept-{c["id"]}"><g class="dag-node">'
+            f'<rect x="{x}" y="{y}" width="{NW}" height="{NH}" rx="9"/>'
+            f'<text x="{x + 14}" y="{y + NH / 2 + 4}" class="dag-num">{c["id"]}</text>'
+            f'<text x="{x + 34}" y="{y + NH / 2 + 4}" class="dag-name">{name}</text>'
+            f'</g></a>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
 def main():
     ap = argparse.ArgumentParser(description="Render intent-timeline HTML from chunks + concepts.")
     ap.add_argument("--chunks", required=True, help="chunks.json from prepare_diff.py")
@@ -673,7 +741,8 @@ def main():
     if data.get("overview"):
         overview = (f'<section class="overview"><h2>Overview</h2><p>{esc(data["overview"])}</p></section>')
 
-    body_html = "<main>" + risks_html + overview + "\n".join(body) + "</main>"
+    dag_html = render_dag(concepts)
+    body_html = "<main>" + dag_html + risks_html + overview + "\n".join(body) + "</main>"
     footer = ("<footer>diff-intent-timeline &middot; single-file review page"
               " &middot; generated from chunks.json + concepts.json</footer>")
 
