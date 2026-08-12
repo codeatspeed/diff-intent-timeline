@@ -71,6 +71,13 @@ Read `chunks.json` (in the work dir prepare printed) and group chunks into conce
 
 Fields: **id** = timeline position (1..N). **name** = short noun phrase ("JWT auth middleware"), not a sentence. **intent** = plain-language rationale. **depends_on** = ids the reviewer must read first. **chunks** = chunk ids.
 
+> **Optional lens fields** (skip when unsure — the page still works without them):
+> `"layer"` — one of `schema | infra | domain | api | test | docs | other` (the
+> architecture layer this concept lives in; the rail and meta show it).
+> `"risk"` — `low | med | high` plus `"risk_reason"` (one line: what breaks or
+> what to check — auth, money, parsing, concurrency, data migrations, etc.).
+> High/med concepts are collected into a "Review first" callout on the page.
+
 **Ground every intent in the code.** If the rationale isn't evident, write `[inferred: ...]` or `[verify: ...]`. If a hunk mixes concerns, say so in its concept's intent instead of forcing it. State what the change does, plainly — no flattery or editorializing.
 
 **Clustering rules:**

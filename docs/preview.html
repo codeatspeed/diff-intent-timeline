@@ -43,7 +43,7 @@ padding:2px 8px 10px}
 #steps{list-style:none;position:relative}
 #steps::before{content:"";position:absolute;left:18px;top:10px;bottom:0;width:2px;
 background:linear-gradient(var(--line),color-mix(in srgb,var(--line) 20%,transparent))}
-.step{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;
+.step{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;
 color:var(--ink);padding:7px 8px;border-radius:9px;cursor:pointer;position:relative}
 .step:hover{background:var(--panel)}
 .step.active{background:var(--panel);box-shadow:0 2px 8px rgba(0,0,0,.12)}
@@ -52,12 +52,32 @@ color:var(--muted);font:700 11px/18px ui-monospace,monospace;text-align:center;p
 .step.active .dot{background:var(--accent);border-color:var(--accent);color:#fff}
 .sname{font-size:13px;font-weight:600;line-height:1.35;padding-top:2px}
 .step.active .sname{color:var(--accent)}
-.sdep{display:block;font-size:10.5px;color:var(--muted);font-weight:500;margin-top:1px}
+.sdep{display:block;flex-basis:100%;font-size:10.5px;color:var(--muted);font-weight:500;margin-top:1px;margin-left:32px}
 main{flex:1;min-width:0}
 .overview{background:linear-gradient(135deg,var(--accent-soft),transparent 60%);border:1px solid var(--line);
 border-left:3px solid var(--accent);border-radius:14px;padding:20px 22px;margin-bottom:26px}
 .overview h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
 .overview p{font-size:15px;color:var(--ink);max-width:75ch}
+.risks{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--del);
+border-radius:14px;padding:16px 20px;margin-bottom:26px}
+.risks h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--del);margin-bottom:10px}
+.risks ol{list-style:none}
+.risk-item a{display:flex;align-items:baseline;gap:10px;color:var(--ink);text-decoration:none;
+padding:5px 4px;border-radius:8px;font-size:14px}
+.risk-item a:hover{background:var(--panel2)}
+.risk-badge{flex:none;font:700 10px/1.6 ui-monospace,monospace;text-transform:uppercase;
+padding:2px 7px;border-radius:5px;background:var(--del-bg);color:var(--del)}
+.risk-item a[href*="concept"] .risk-badge{background:var(--del-bg)}
+.risk-why{color:var(--muted);font-size:12.5px}
+@media print{.risks{display:none}}
+svg.dag{display:block;width:100%;max-width:1100px;height:auto;margin:0 0 26px;
+background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.dag-edge{stroke:var(--muted);stroke-width:1.5}
+#dag-arrow path{fill:var(--muted)}
+.dag-node rect{fill:var(--panel2);stroke:var(--line);stroke-width:1}
+.dag-node:hover rect{stroke:var(--accent)}
+.dag-num{fill:var(--accent);font:700 12px/1 ui-monospace,monospace}
+.dag-name{fill:var(--ink);font:600 12.5px/1 "Inter Variable","Inter",sans-serif}
 .concept{background:var(--panel);border:1px solid var(--line);border-radius:16px;margin:0 0 30px;
 overflow:hidden;box-shadow:var(--shadow);scroll-margin-top:96px}
 .c-head{display:flex;gap:16px;padding:18px 22px 0;align-items:flex-start}
@@ -69,6 +89,12 @@ font:700 17px/38px ui-monospace,monospace;text-align:center;box-shadow:0 2px 8px
 .chip.sm{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);
 color:var(--muted);font-weight:600}
 .chip.sm .plus{color:var(--add)} .chip.sm .minus{color:var(--del)}
+.chip.sm.chip-layer{background:var(--accent-soft);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
+.chip.sm.chip-risk{text-transform:uppercase;font-size:10px;letter-spacing:.05em}
+.chip.sm.chip-risk-low{background:var(--add-bg);color:var(--add)}
+.chip.sm.chip-risk-med{background:rgba(245,158,11,.12);color:#b45309}
+:root[data-theme=dark] .chip.sm.chip-risk-med{color:#fbbf24}
+.chip.sm.chip-risk-high{background:var(--del-bg);color:var(--del)}
 .intent{margin:14px 22px 0;padding:12px 16px;background:var(--accent-soft);border-left:3px solid var(--accent);
 border-radius:0 10px 10px 0;font-size:14px;color:var(--ink);max-width:75ch}
 .intent .why{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);
@@ -112,6 +138,23 @@ background:var(--panel);color:var(--ink);cursor:pointer}
 .fs-overlay .diff{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:12px;
 background:var(--panel2);font-size:14.5px}
 .fs-overlay .dl .ln{font-size:12px}
+/* tour mode: spotlight one concept at a time with a floating narration bar */
+button.ctl.tour-active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+body.tour-on .concept{opacity:.28;pointer-events:none;transition:opacity .25s}
+body.tour-on .concept.tour-current{opacity:1;pointer-events:auto;box-shadow:0 0 0 3px var(--accent)}
+.tour-bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:95;display:flex;
+align-items:center;gap:12px;max-width:min(760px,92vw);padding:10px 16px;border-radius:14px;
+border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 92%,transparent);
+backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.tour-count{font:700 11px/1 ui-monospace,monospace;color:var(--muted);white-space:nowrap}
+.tour-title{font:600 13.5px/1.3 "Inter Variable","Inter",sans-serif;white-space:nowrap;overflow:hidden;
+text-overflow:ellipsis;max-width:220px}
+.tour-intent{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
+white-space:nowrap;max-width:260px}
+.tour-bar button{font:600 12px/1 inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);
+background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap}
+.tour-bar button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.tour-bar button:disabled{opacity:.4;cursor:default}
 /* side-by-side diff: 4-column grid (old-ln | old-code | new-ln | new-code) */
 .diff{overflow-x:auto;border-top:1px solid var(--line);font-size:13.5px;line-height:1.5;
 scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 45%,transparent) transparent}
@@ -162,7 +205,7 @@ footer{padding:30px;text-align:center;color:var(--muted);font-size:13px;border-t
 header.top{padding:12px 14px}
 #rail{position:static;width:auto;height:auto;max-height:none}#steps{display:flex;flex-wrap:wrap;gap:4px}
 #steps::before{display:none}.step{width:auto;min-height:44px;border:1px solid var(--line);background:var(--panel);
-padding:8px 14px;border-radius:999px}.dot{display:none}
+padding:8px 14px;border-radius:999px}.dot{display:none}.sdep{margin-left:0}
 button.fs,button.ctl,button.next{min-height:44px;padding:10px 16px}
 details.hunk summary{min-height:44px;padding:12px 14px}}
 @media (max-width:700px){.dl{grid-template-columns:2.5em minmax(0,1fr) 2.5em minmax(0,1fr)}}
@@ -361,7 +404,7 @@ box-shadow:none}.layout{display:block;max-width:none;padding:0}}
 <li><button class="step" data-index="3"><span class="dot">4</span><span class="sname">HTTP API</span></button></li>
 <li><button class="step" data-index="4"><span class="dot">5</span><span class="sname">Domain test</span></button></li>
 <li><button class="step" data-index="5"><span class="dot">6</span><span class="sname">Endpoint docs</span></button></li></ol></nav>
-<main><section class="overview"><h2>Overview</h2><p>Adds the full order placement flow to the skeleton service: a Postgres schema for orders and line items, a thin DB access layer, domain functions for creating and reading orders, HTTP endpoints wired to the domain, a test, and endpoint docs.</p></section><article class="concept" id="concept-1" data-index="0">
+<main><svg class="dag" viewBox="0 0 1224 116" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Concept dependency map"><defs><marker id="dag-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs><line class="dag-edge" x1="202" y1="33.0" x2="272" y2="33.0" marker-end="url(#dag-arrow)"/><line class="dag-edge" x1="452" y1="33.0" x2="522" y2="33.0" marker-end="url(#dag-arrow)"/><line class="dag-edge" x1="702" y1="33.0" x2="772" y2="33.0" marker-end="url(#dag-arrow)"/><line class="dag-edge" x1="702" y1="33.0" x2="772" y2="83.0" marker-end="url(#dag-arrow)"/><line class="dag-edge" x1="952" y1="33.0" x2="1022" y2="33.0" marker-end="url(#dag-arrow)"/><a href="#concept-1"><g class="dag-node"><rect x="22" y="16" width="180" height="34" rx="9"/><text x="36" y="37.0" class="dag-num">1</text><text x="56" y="37.0" class="dag-name">Orders schema</text></g></a><a href="#concept-2"><g class="dag-node"><rect x="272" y="16" width="180" height="34" rx="9"/><text x="286" y="37.0" class="dag-num">2</text><text x="306" y="37.0" class="dag-name">DB access layer</text></g></a><a href="#concept-3"><g class="dag-node"><rect x="522" y="16" width="180" height="34" rx="9"/><text x="536" y="37.0" class="dag-num">3</text><text x="556" y="37.0" class="dag-name">Order domain logic</text></g></a><a href="#concept-4"><g class="dag-node"><rect x="772" y="16" width="180" height="34" rx="9"/><text x="786" y="37.0" class="dag-num">4</text><text x="806" y="37.0" class="dag-name">HTTP API</text></g></a><a href="#concept-5"><g class="dag-node"><rect x="772" y="66" width="180" height="34" rx="9"/><text x="786" y="87.0" class="dag-num">5</text><text x="806" y="87.0" class="dag-name">Domain test</text></g></a><a href="#concept-6"><g class="dag-node"><rect x="1022" y="16" width="180" height="34" rx="9"/><text x="1036" y="37.0" class="dag-num">6</text><text x="1056" y="37.0" class="dag-name">Endpoint docs</text></g></a></svg><section class="overview"><h2>Overview</h2><p>Adds the full order placement flow to the skeleton service: a Postgres schema for orders and line items, a thin DB access layer, domain functions for creating and reading orders, HTTP endpoints wired to the domain, a test, and endpoint docs.</p></section><article class="concept" id="concept-1" data-index="0">
 <div class="c-head"><div class="c-num">1</div><div class="c-titles">
 <h2>Orders schema</h2><div class="c-meta"><span class="chip sm">1 file</span><span class="chip sm"><span class="plus">+17</span><span class="sep"> </span><span class="minus">-0</span></span><span class="chip sm">1 hunk</span><span class="chip sm">foundation</span></div></div></div>
 <p class="intent"><span class="why">Why this exists</span>The service has no persistence yet. These two tables are the storage contract: orders with total_cents kept in integer cents (no float money), order_items with a quantity check and a cascade delete so an order&#x27;s items never outlive it, plus a customer lookup index.</p>
@@ -538,7 +581,8 @@ box-shadow:none}.layout{display:block;max-width:none;padding:0}}
   var reduceMotion=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   function setActive(i){cur=i;steps.forEach(function(s){s.classList.toggle('active',+s.dataset.index===i)});}
   function goto(i){if(i<0||i>=cards.length)return;var c=cards[i];c.querySelectorAll('details').forEach(function(d){d.open=true});
-    c.scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'});setActive(i);}
+    c.scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'});setActive(i);
+    if(tourOn){tourI=i;tourUpdate();}}
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)setActive(+e.target.dataset.index)})},
     {rootMargin:'-30% 0px -60% 0px'});
   cards.forEach(function(c){io.observe(c)});
@@ -551,6 +595,8 @@ box-shadow:none}.layout{display:block;max-width:none;padding:0}}
       else if(e.key==='Tab'){e.preventDefault();if(fsOverlay)fsOverlay.querySelector('.fs-close').focus();}
       return;
     }
+    if(tourOn){if(e.key==='j'||e.key==='ArrowDown'){e.preventDefault();tourGo(tourI+1);return;}
+      if(e.key==='k'||e.key==='ArrowUp'){e.preventDefault();tourGo(tourI-1);return;}}
     if(e.target.closest('details,textarea,input,[contenteditable]'))return;
     if(e.key==='j'||e.key==='ArrowDown'){e.preventDefault();goto(Math.min(cur+1,cards.length-1));}
     if(e.key==='k'||e.key==='ArrowUp'){e.preventDefault();goto(Math.max(cur-1,0));}
@@ -592,6 +638,55 @@ box-shadow:none}.layout{display:block;max-width:none;padding:0}}
       e.preventDefault();e.stopPropagation();fsShow(h);
     });
   });
+  // tour mode: spotlight one concept at a time with a floating narration bar
+  var tourOn=false,tourI=0,tourBar=null;
+  function tourCur(){return tourI<cards.length?cards[tourI]:null}
+  function tourUpdate(){
+    if(!tourBar)return;
+    var c=tourCur();
+    cards.forEach(function(x){x.classList.toggle('tour-current',x===c)});
+    var prev=tourBar.querySelector('.tour-prev'),next=tourBar.querySelector('.tour-next');
+    prev.disabled=tourI<=0;next.disabled=tourI>=cards.length-1;
+    if(c){
+      tourBar.querySelector('.tour-count').textContent=(tourI+1)+' / '+cards.length;
+      var h=c.querySelector('h2');
+      tourBar.querySelector('.tour-title').textContent=h?h.textContent:'';
+      var it=c.querySelector('.intent');
+      tourBar.querySelector('.tour-intent').textContent=it?it.textContent.replace(/^Why this exists/,'').trim():'';
+    }
+  }
+  function tourGo(i){
+    if(!tourOn)return;
+    tourI=Math.max(0,Math.min(cards.length-1,i));
+    goto(tourI);
+    tourUpdate();
+  }
+  function tourBuild(){
+    if(tourBar)return;
+    tourBar=document.createElement('div');
+    tourBar.className='tour-bar';
+    tourBar.innerHTML='<button class="tour-prev" type="button">&#8592;</button>'
+      +'<span class="tour-count"></span>'
+      +'<span class="tour-title"></span><span class="tour-intent"></span>'
+      +'<button class="tour-next" type="button">&#8594;</button>'
+      +'<button class="tour-close" type="button">End tour</button>';
+    tourBar.querySelector('.tour-prev').addEventListener('click',function(){tourGo(tourI-1)});
+    tourBar.querySelector('.tour-next').addEventListener('click',function(){tourGo(tourI+1)});
+    tourBar.querySelector('.tour-close').addEventListener('click',tourOff);
+    document.body.appendChild(tourBar);
+  }
+  function tourOn_(){tourBuild();tourOn=true;document.body.classList.add('tour-on');tourGo(0);}
+  function tourOff(){tourOn=false;document.body.classList.remove('tour-on');
+    cards.forEach(function(x){x.classList.remove('tour-current')});
+    if(tourBar){tourBar.remove();tourBar=null;}
+    document.getElementById('tour-toggle').classList.remove('tour-active');
+    document.getElementById('tour-toggle').textContent='Tour';}
+  var btnTour=document.createElement('button');
+  btnTour.id="tour-toggle";btnTour.className='ctl';btnTour.type='button';btnTour.textContent='Tour';
+  btnTour.addEventListener('click',function(){
+    if(tourOn){tourOff();}else{tourOn_();this.classList.add('tour-active');this.textContent='End tour';}
+  });
+  document.querySelector('.chips').appendChild(btnTour);
   var bar=document.getElementById('progress');
   window.addEventListener('scroll',function(){var h=document.documentElement;
     bar.style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';},{passive:true});
