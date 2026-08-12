@@ -92,6 +92,17 @@ consumer.
 | `scripts/prepare_diff.py` | git diff / commit / unified diff → `chunks.json` + `summary.json` (one chunk per hunk, rename-aware, binary-safe, truncation-safe) |
 | `scripts/render.py` | `chunks.json` + `concepts.json` → single-file HTML timeline |
 
+## Requirements
+
+- **Python 3.9+** — the scripts are stdlib-only.
+- **git CLI** — needed only for `--repo` / `--base` / `--commit` modes.
+  `--diff-file` mode reads any unified diff and works without git.
+- **pygments** *(optional)* — syntax highlighting inside the diff. Without it
+  the page renders with plain add/remove/context coloring.
+- **node** *(optional)* — used only by `test/verify.py` for the inline-JS
+  syntax check; skipped when absent.
+- The `skills` CLI itself needs **Node.js 18+** (`npx`).
+
 ## Test
 
 Self-contained verification (generates its own throwaway git repo, runs the

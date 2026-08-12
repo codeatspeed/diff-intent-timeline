@@ -141,12 +141,21 @@ check("html self-contained", not re.findall(r'(?:src|href)="http[^"]*"', src))
 check("6 concept cards, ids 1..6 sequential",
       [int(x) for x in re.findall(r'id="concept-(\d+)"', src)] == list(range(1, 7)))
 check("no unescaped brackets in code", not re.findall(r'<span class="code">[^<]*<[^/a-z!]', src))
+# side-by-side: every code row has 4 cells (old-ln, old-code, new-ln, new-code),
+# except full-width hunk/no-newline rows
+rows = re.findall(r'<div class="dl (dl-\w+)">(.*?)</div>', src, re.S)
+bad = [r for cls, r in rows if cls not in ("dl-hunk", "dl-nl")
+       and not (len(re.findall(r'<span class="ln"', r)) == 2
+                and len(re.findall(r'<span class="code"', r)) == 2)]
+check("side-by-side rows have 4 cells (old|new)", not bad, f"{len(bad)} malformed rows")
 
 try:
     import pygments  # noqa: F401
     check("pygments token spans", len(re.findall(r'class="(?:kd|nx|s1|c1|mi|o|w)"', src)) > 20)
-    check("pygments css embedded", bool(re.findall(r'\.diff \.\w+\{color:', src)))
-    check("dark theme overrides", ":root[data-theme=dark] .diff .kd" in src)
+    check("light palette scoped", ":root:not([data-theme=dark]) .diff .k" in src)
+    check("dark palette scoped (monokai)", ":root[data-theme=dark] .diff .k" in src)
+    check("dark plain-row override beats tokens",
+          ":root[data-theme=dark] .diff .dl-del .code span{color:inherit!important}" in src)
 except ImportError:
     print("SKIP pygments checks (not installed)")
 

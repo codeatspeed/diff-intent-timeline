@@ -10,6 +10,8 @@ Usage:
       [--title "..."] [--subtitle "..."] [--out timeline.html] [--no-highlight]
 
 Python 3 stdlib; syntax highlighting via pygments when installed (optional).
+Diffs render GitHub-style side-by-side (old | new). Light + dark themes with
+scoped pygments palettes ('friendly' for light, 'monokai' for dark).
 """
 
 import argparse
@@ -31,10 +33,10 @@ CSS = """
 --line:#e6e3db;--accent:#4f46e5;--accent-soft:#eef0ff;--add:#15803d;--add-bg:#f0fdf4;
 --del:#b91c1c;--del-bg:#fef2f2;--hunk:#7c3aed;--hunk-bg:#f6f1fd;--code:#141310;
 --rail:#f0efeb;--shadow:0 1px 2px rgba(20,19,16,.06)}
-:root[data-theme=dark]{--bg:#0e1013;--panel:#15181d;--panel2:#12151a;--ink:#e7e5e2;
---muted:#8b8780;--line:#262b33;--accent:#818cf8;--accent-soft:rgba(99,102,241,.15);
---add:#4ade80;--add-bg:rgba(74,222,128,.10);--del:#f87171;--del-bg:rgba(248,113,113,.10);
---hunk:#c4b5fd;--hunk-bg:rgba(139,92,246,.12);--code:#e7e5e2;--rail:#111419;
+:root[data-theme=dark]{--bg:#0e1013;--panel:#15181d;--panel2:#12151a;--ink:#eae8e5;
+--muted:#a8adb5;--line:#2a3038;--accent:#818cf8;--accent-soft:rgba(99,102,241,.15);
+--add:#4ade80;--add-bg:rgba(74,222,128,.10);--del:#fda4af;--del-bg:rgba(248,113,113,.13);
+--hunk:#c4b5fd;--hunk-bg:rgba(139,92,246,.12);--code:#eae8e5;--rail:#111419;
 --shadow:0 1px 2px rgba(0,0,0,.4)}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -44,9 +46,9 @@ code,kbd,.mono{font-family:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mon
 #progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:60;transition:width .08s linear}
 header.top{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 88%,transparent);
 backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 22px}
-.top-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;max-width:1180px;margin:0 auto}
+.top-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;max-width:1480px;margin:0 auto}
 h1{font-size:19px;font-weight:700;letter-spacing:-.01em}
-.subtitle{color:var(--muted);font-size:12.5px;margin-top:2px;max-width:640px;overflow:hidden;
+.subtitle{color:var(--muted);font-size:12.5px;margin-top:2px;max-width:760px;overflow:hidden;
 text-overflow:ellipsis;white-space:nowrap}
 .chips{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 .chip{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--panel);
@@ -56,7 +58,7 @@ border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 button.ctl{font:600 12.5px/1 inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);
 background:var(--panel);color:var(--ink);cursor:pointer}
 button.ctl:hover{border-color:var(--accent);color:var(--accent)}
-.layout{display:flex;gap:28px;max-width:1180px;margin:26px auto 80px;padding:0 22px}
+.layout{display:flex;gap:28px;max-width:1480px;margin:26px auto 80px;padding:0 22px}
 #rail{width:248px;flex:none;position:sticky;top:78px;align-self:flex-start;max-height:calc(100vh - 100px);
 overflow:auto;background:var(--rail);border:1px solid var(--line);border-radius:14px;padding:14px 12px}
 .rail-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
@@ -73,7 +75,7 @@ color:var(--muted);font:700 11px/18px ui-monospace,monospace;text-align:center;p
 .sname{font-size:12.5px;font-weight:600;line-height:1.35;padding-top:2px}
 .step.active .sname{color:var(--accent)}
 .sdep{display:block;font-size:10.5px;color:var(--muted);font-weight:500;margin-top:1px}
-main{flex:1;min-width:0;max-width:880px}
+main{flex:1;min-width:0}
 .overview{background:linear-gradient(135deg,var(--accent-soft),transparent 60%);border:1px solid var(--line);
 border-left:3px solid var(--accent);border-radius:14px;padding:20px 22px;margin-bottom:26px}
 .overview h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
@@ -111,49 +113,38 @@ details.hunk[open] summary .caret{transform:rotate(90deg)}
 .fpath{font:600 12.5px/1.4 ui-monospace,monospace;word-break:break-all}
 .fcounts{margin-left:auto;font:600 11px ui-monospace,monospace;white-space:nowrap}
 .fcounts .plus{color:var(--add)} .fcounts .minus{color:var(--del)} .fcounts .sep{color:var(--muted)}
-.diff{overflow-x:auto;border-top:1px solid var(--line);font-size:12.5px;line-height:1.5}
-.dl{display:grid;grid-template-columns:3.6em 1fr;min-width:max-content}
-.ln{grid-column:1;text-align:right;padding:0 10px;color:var(--muted);background:color-mix(in srgb,var(--panel2) 60%,transparent);
-border-right:1px solid var(--line);user-select:none;font-size:11px}
-.code{grid-column:2;padding:0 12px;white-space:pre;color:var(--code);font-family:inherit}
-.dl-add .ln,.dl-del .ln{font-weight:600}
+/* side-by-side diff: 4-column grid (old-ln | old-code | new-ln | new-code) */
+.diff{overflow-x:auto;border-top:1px solid var(--line);font-size:13px;line-height:1.5}
+.dl{display:grid;grid-template-columns:4em minmax(0,1fr) 4em minmax(0,1fr);min-width:max-content}
+.dl .ln{text-align:right;padding:0 10px;color:var(--muted);user-select:none;font-size:11px;
+background:color-mix(in srgb,var(--panel2) 55%,transparent);border-right:1px solid var(--line);
+position:sticky;left:0}
+.dl .ln:nth-child(3){left:auto}
+.dl .code{padding:0 12px;white-space:pre;color:var(--code);font-family:inherit}
 .dl-add{background:var(--add-bg)} .dl-add .code{color:var(--add)}
 .dl-del{background:var(--del-bg)} .dl-del .code{color:var(--del)}
 .dl-ctx .code{color:var(--muted)}
-.dl-hunk{background:var(--hunk-bg)}
-.dl-hunk .ln{color:var(--hunk)} .dl-hunk .code{color:var(--hunk);font-weight:600}
-.pfx{display:inline-block;width:1em;font-weight:700;user-select:none}
-.dl-add .pfx{color:var(--add)} .dl-del .pfx{color:var(--del)}
-.dl-nl{background:transparent} .dl-nl .code{color:var(--muted);font-style:italic}
+.dl-hunk .code,.dl-nl .code{grid-column:1/-1;padding:2px 12px;font-weight:600}
+.dl-hunk{background:var(--hunk-bg)} .dl-hunk .code{color:var(--hunk)}
+.dl-nl .code{color:var(--muted);font-style:italic;font-weight:400}
 .next-wrap{display:flex;justify-content:flex-end;padding:0 22px 18px}
 button.next{font:600 12.5px/1 inherit;padding:8px 14px;border-radius:9px;border:1px solid var(--accent);
 background:var(--accent);color:#fff;cursor:pointer}
 button.next:hover{filter:brightness(1.1)}
-footer{padding:30px;text-align:center;color:var(--muted);font-size:12px}
-@media (max-width:860px){.layout{flex-direction:column;padding:0 14px}
+footer{padding:30px;text-align:center;color:var(--muted);font-size:13px}
+@media (max-width:900px){.layout{flex-direction:column;padding:0 14px}
 #rail{position:static;width:auto;max-height:none}#steps{display:flex;flex-wrap:wrap;gap:4px}
 #steps::before{display:none}.step{width:auto}.dot{display:none}}
 @media print{header.top,#rail,.next-wrap,button{display:none!important}.concept{break-inside:avoid;
 box-shadow:none}.layout{display:block;max-width:none;padding:0}}
 """
 
-# dark-theme overrides for the common pygments token classes (pygments styles are
-# light-biased; these keep keyword/string/comment/number readable on dark bg)
-DARK_PYG_OVERRIDES = """
-:root[data-theme=dark] .diff .kd,:root[data-theme=dark] .diff .kn,
-:root[data-theme=dark] .diff .kw,:root[data-theme=dark] .diff .kc,
-:root[data-theme=dark] .diff .kt,:root[data-theme=dark] .diff .kr,
-:root[data-theme=dark] .diff .k{color:#ff7b72}
-:root[data-theme=dark] .diff .s,:root[data-theme=dark] .diff .s1,
-:root[data-theme=dark] .diff .s2,:root[data-theme=dark] .diff .sr,
-:root[data-theme=dark] .diff .sb,:root[data-theme=dark] .diff .sc{color:#a5d6ff}
-:root[data-theme=dark] .diff .c,:root[data-theme=dark] .diff .c1,
-:root[data-theme=dark] .diff .cm,:root[data-theme=dark] .diff .cc{color:#8b949e}
-:root[data-theme=dark] .diff .mi,:root[data-theme=dark] .diff .mf,
-:root[data-theme=dark] .diff .mh,:root[data-theme=dark] .diff .il,
-:root[data-theme=dark] .diff .mo,:root[data-theme=dark] .diff .mb{color:#79c0ff}
-:root[data-theme=dark] .diff .na,:root[data-theme=dark] .diff .nb,
-:root[data-theme=dark] .diff .nx{color:#d2a8ff}
+# dark mode: plain row colors inside tinted add/del rows - per-token syntax
+# colors clash with the green/red tint (GitHub renders diffs unhighlighted).
+# Must beat the scoped pygments rules, so: appended AFTER pyg_css + !important.
+DARK_ROW_OVERRIDES = """
+:root[data-theme=dark] .diff .dl-add .code span{color:inherit!important}
+:root[data-theme=dark] .diff .dl-del .code span{color:inherit!important}
 """
 
 JS = """
@@ -223,40 +214,58 @@ def highlight(code, lang):
         return None
 
 
+def scope_css(css, scope):
+    """Prefix every selector in pygments-generated CSS with a theme scope."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)  # pygments appends /* token */ comments
+    out = []
+    for rule in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        sels, decls = rule
+        scoped = ",".join(f"{scope} {s.strip()}" for s in sels.split(",") if s.strip())
+        out.append(f"{scoped}{{{decls}}}")
+    return "\n".join(out)
+
+
 def render_hunk_rows(chunk, want_hl):
+    """Side-by-side rows: old | new. Context shows on both sides, deletions
+    only on the old side, additions only on the new side."""
     rows = []
     lines = chunk.get("content", "").split("\n")
     m = HUNK_RE.match(lines[0]) if lines else None
-    old_n, new_n = (m.group(1), m.group(3)) if m else (0, 0)
-    old_n, new_n = int(old_n), int(new_n)
+    old_n, new_n = (int(m.group(1)), int(m.group(3))) if m else (0, 0)
     for line in lines[1:]:
         if not line:
             continue
         if line.startswith("\\"):
-            rows.append(('<div class="dl dl-nl"><span class="ln"></span>'
-                         '<span class="code">' + esc(line) + "</span></div>"))
+            rows.append('<div class="dl dl-nl"><span class="code">' + esc(line) + "</span></div>")
+            continue
+        if line.startswith("@@"):
+            rows.append('<div class="dl dl-hunk"><span class="code">' + esc(line) + "</span></div>")
             continue
         if line.startswith("+"):
-            code, cls, ln = line[1:], "dl-add", new_n
+            code, cls, old_ln, new_ln = line[1:], "dl-add", "", new_n
             new_n += 1
         elif line.startswith("-"):
-            code, cls, ln = line[1:], "dl-del", old_n
+            code, cls, old_ln, new_ln = line[1:], "dl-del", old_n, ""
             old_n += 1
-        elif line.startswith("@@"):
-            rows.append('<div class="dl dl-hunk"><span class="ln"></span>'
-                        '<span class="code">' + esc(line) + "</span></div>")
-            continue
         else:
-            code, cls, ln = line[1:] if line.startswith(" ") else line, "dl-ctx", new_n
+            code, cls, old_ln, new_ln = (line[1:] if line.startswith(" ") else line,
+                                         "dl-ctx", old_n, new_n)
             old_n += 1
             new_n += 1
-        hl = ""
+        inner = esc(code)
         if cls in ("dl-add", "dl-del") and want_hl:
             tokens = highlight(code, chunk.get("language", "text"))
             if tokens:
-                hl = tokens
-        rows.append(f'<div class="dl {cls}"><span class="ln">{ln}</span>'
-                    f'<span class="code"><span class="pfx">{cls[3]}</span>{hl or esc(code)}</span></div>')
+                inner = tokens
+        if cls == "dl-add":
+            rows.append(f'<div class="dl {cls}"><span class="ln"></span><span class="code"></span>'
+                        f'<span class="ln">{new_ln}</span><span class="code">{inner}</span></div>')
+        elif cls == "dl-del":
+            rows.append(f'<div class="dl {cls}"><span class="ln">{old_ln}</span><span class="code">{inner}</span>'
+                        f'<span class="ln"></span><span class="code"></span></div>')
+        else:
+            rows.append(f'<div class="dl {cls}"><span class="ln">{old_ln}</span><span class="code">{inner}</span>'
+                        f'<span class="ln">{new_ln}</span><span class="code">{inner}</span></div>')
     return "\n".join(rows)
 
 
@@ -291,14 +300,16 @@ def main():
     if not args.no_highlight:
         try:
             from pygments.formatters import HtmlFormatter
-            pyg_css = HtmlFormatter(style="friendly").get_style_defs(".diff")
+            pyg_css = (scope_css(HtmlFormatter(style="friendly").get_style_defs(".diff"),
+                                 ":root:not([data-theme=dark])") + "\n" +
+                       scope_css(HtmlFormatter(style="monokai").get_style_defs(".diff"),
+                                 ":root[data-theme=dark]"))
         except Exception:
             pyg_css = ""
-    css_block = CSS + ("\n" + pyg_css if pyg_css else "") + DARK_PYG_OVERRIDES
+    css_block = CSS + ("\n" + pyg_css if pyg_css else "") + DARK_ROW_OVERRIDES
 
     by_id = {c["id"]: c for c in chunks}
     assigned = set()
-    concept_cards = []
     total_add = total_del = 0
     for c in chunks:
         total_add += c.get("added", 0)
