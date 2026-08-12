@@ -223,9 +223,9 @@ check("risk reason tooltip", 'title="auth gate"' in s)
 check("lens schema backward compatible",
       'class="chip sm chip-layer">' not in (TMP / "t.html").read_text())
 check("top-risks callout lists high-risk concepts",
-      'class="risks"' in s and "auth gate" in s and "Schema" in s)
+      'class="risks"' in s and "auth gate" in s and 'class="risk-badge">high</span>Schema' in s)
 check("dependency graph svg present",
-      '<svg class="dag"' in s and "<marker" in s and "concept-2" in s)
+      '<svg class="dag"' in s and "<marker" in s and 'class="dag-node"' in s and "concept-2" in s)
 check("tour toggle present", 'id="tour-toggle"' in s)
 
 shutil.rmtree(TMP, ignore_errors=True)

@@ -188,6 +188,7 @@ background:var(--panel2);font-size:14.5px}
 /* tour mode: spotlight one concept at a time with a floating narration bar */
 button.ctl.tour-active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
 body.tour-on .concept{opacity:.28;pointer-events:none;transition:opacity .25s}
+body.tour-on svg.dag,body.tour-on .risks{opacity:.28;pointer-events:none}
 body.tour-on .concept.tour-current{opacity:1;pointer-events:auto;box-shadow:0 0 0 3px var(--accent)}
 .tour-bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:95;display:flex;
 align-items:center;gap:12px;max-width:min(760px,92vw);padding:10px 16px;border-radius:14px;
@@ -259,7 +260,7 @@ details.hunk summary{min-height:44px;padding:12px 14px}}
 @media (max-width:480px){.chips{gap:6px}.chip{font-size:11px;padding:3px 8px}
 button.ctl{font-size:11.5px;padding:6px 10px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}#progress,.caret{transition:none}}
-@media print{header.top,#rail,.next-wrap,button,.fs-overlay{display:none!important}.concept{break-inside:avoid;
+@media print{header.top,#rail,.next-wrap,button,.fs-overlay,.tour-bar{display:none!important}.concept{break-inside:avoid;
 box-shadow:none}.layout{display:block;max-width:none;padding:0}}
 """
 
@@ -618,7 +619,8 @@ def render_hunk(chunk, want_hl, open_=False):
 
 def render_dag(concepts):
     """Layered dependency DAG as inline SVG (stdlib only). Columns are the
-    longest-path depth from root concepts; edges always run left -> right.
+    longest-path depth from root concepts; edges run left -> right, except
+    cycle back-edges.
     Returns '' when there are fewer than 2 concepts (nothing to map)."""
     if len(concepts) < 2:
         return ""
