@@ -47,18 +47,18 @@ npx skills use codeatspeed/diff-intent-timeline --skill diff-intent-timeline
 
 ## Usage
 
-Any agent that has loaded the skill runs the 3-step pipeline:
+Any agent that has loaded the skill runs the 3-step pipeline. All intermediates (chunks, concepts, summary) and the final HTML land in a per-run **work dir** under `~/.cache/diff-intent-timeline/` — never inside the repo being analyzed. Pass `--out` to override:
 
 ```bash
-# 1. split the diff into chunks (JSON)
-python3 scripts/prepare_diff.py --repo . --commit HEAD --out .dit/
+# 1. split the diff into chunks (JSON) — prints the work dir path
+python3 scripts/prepare_diff.py --repo . --commit HEAD
 
-# 2. agent reads chunks.json, authors concepts.json
+# 2. agent reads chunks.json (in the work dir), authors concepts.json next to it
 #    (cluster hunks into concepts; see SKILL.md for the rules)
 
-# 3. render the HTML
-python3 scripts/render.py --chunks .dit/chunks.json --concepts .dit/concepts.json \
-  --title "orders-service: implement order flow" --out timeline.html
+# 3. render the HTML (defaults to timeline.html next to --chunks)
+python3 scripts/render.py --chunks <workdir>/chunks.json --concepts <workdir>/concepts.json \
+  --title "orders-service: implement order flow"
 ```
 
 Open `timeline.html` in any browser. `j`/`k` move between concepts, the rail

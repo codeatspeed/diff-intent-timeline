@@ -24,13 +24,13 @@ python3 scripts/prepare_diff.py --repo <path> --commit <sha>
 python3 scripts/prepare_diff.py --diff-file changes.diff
 ```
 
-Writes `chunks.json` (one object per hunk: id, file, status, language, line ranges, +/- counts, raw content, truncated flag) and `summary.json` (files, totals, languages, skipped binaries) into `--out DIR` (default: cwd). Flags: `--context N` (default 3), `--max-chunk-bytes` (default 6000).
+Writes `chunks.json` (one object per hunk: id, file, status, language, line ranges, +/- counts, raw content, truncated flag) and `summary.json` (files, totals, languages, skipped binaries) into `--out DIR` (default: a per-run **work dir** under `~/.cache/diff-intent-timeline/` — never the target repo; these are pipeline intermediates). Flags: `--context N` (default 3), `--max-chunk-bytes` (default 6000). The script prints the work dir path — remember it for steps 2–3.
 
 **Done when:** `chunks.json` covers every hunk and `summary.json` captures the totals. If `totals.chunks` is huge (>~250), split the diff by directory or file group and run the pipeline per part — don't cluster hundreds of hunks in one pass.
 
 ### Step 2 — Cluster: author `concepts.json`
 
-Read `chunks.json` and group chunks into concepts. Write `concepts.json`:
+Read `chunks.json` (in the work dir prepare printed) and group chunks into concepts. Write `concepts.json` **next to `chunks.json`** in the work dir:
 
 ```json
 {
@@ -63,11 +63,11 @@ Fields: **id** = timeline position (1..N). **name** = short noun phrase ("JWT au
 ### Step 3 — Render: produce the HTML
 
 ```bash
-python3 scripts/render.py --chunks chunks.json --concepts concepts.json \
-  --title "orders-service: implement order flow" --out timeline.html
+python3 scripts/render.py --chunks <workdir>/chunks.json --concepts <workdir>/concepts.json \
+  --title "orders-service: implement order flow"
 ```
 
-Flags: `--subtitle "..."`, `--no-highlight`. Unassigned chunks are auto-appended as a final "Unassigned chunks" concept with a warning — a safety net, not a workflow; assign deliberately in step 2.
+Flags: `--subtitle "..."`, `--no-highlight`, `--out <path>` (the HTML defaults to `timeline.html` next to `--chunks`, i.e. the work dir — leave it there; copy it into the repo only if the user wants the preview committed). Unassigned chunks are auto-appended as a final "Unassigned chunks" concept with a warning — a safety net, not a workflow; assign deliberately in step 2.
 
 **Done when:** the HTML opens cleanly from disk (`file://`) with no console errors — the rail highlights as you scroll, expand/collapse works, j/k navigates.
 

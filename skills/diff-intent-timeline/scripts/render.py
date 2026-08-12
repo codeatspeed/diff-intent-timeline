@@ -45,8 +45,8 @@ Roboto,"Inter","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialia
 code,kbd,.mono{font-family:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace}
 #progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:60;transition:width .08s linear}
 header.top{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 88%,transparent);
-backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 22px}
-.top-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;max-width:1480px;margin:0 auto}
+backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 32px}
+.top-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 h1{font-size:19px;font-weight:700;letter-spacing:-.01em}
 .subtitle{color:var(--muted);font-size:12.5px;margin-top:2px;max-width:760px;overflow:hidden;
 text-overflow:ellipsis;white-space:nowrap}
@@ -58,15 +58,15 @@ border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 button.ctl{font:600 12.5px/1 inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);
 background:var(--panel);color:var(--ink);cursor:pointer}
 button.ctl:hover{border-color:var(--accent);color:var(--accent)}
-.layout{display:flex;gap:28px;max-width:1480px;margin:26px auto 80px;padding:0 22px}
-#rail{width:248px;flex:none;position:sticky;top:78px;align-self:flex-start;max-height:calc(100vh - 100px);
+.layout{display:flex;gap:28px;margin:26px auto 0;padding:0 32px;width:100%}
+#rail{width:248px;flex:none;position:sticky;top:84px;align-self:flex-start;max-height:calc(100vh - 100px);
 overflow:auto;background:var(--rail);border:1px solid var(--line);border-radius:14px;padding:14px 12px}
 .rail-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
 padding:2px 8px 10px}
 #steps{list-style:none;position:relative}
-#steps::before{content:"";position:absolute;left:15px;top:10px;bottom:10px;width:2px;background:var(--line)}
+#steps::before{content:"";position:absolute;left:18px;top:10px;bottom:10px;width:2px;background:var(--line)}
 .step{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;
-padding:7px 8px;border-radius:9px;cursor:pointer;position:relative}
+color:var(--ink);padding:7px 8px;border-radius:9px;cursor:pointer;position:relative}
 .step:hover{background:var(--panel)}
 .step.active{background:var(--panel);box-shadow:var(--shadow)}
 .dot{flex:none;width:22px;height:22px;border-radius:50%;background:var(--panel);border:2px solid var(--line);
@@ -113,14 +113,42 @@ details.hunk[open] summary .caret{transform:rotate(90deg)}
 .fpath{font:600 12.5px/1.4 ui-monospace,monospace;word-break:break-all}
 .fcounts{margin-left:auto;font:600 11px ui-monospace,monospace;white-space:nowrap}
 .fcounts .plus{color:var(--add)} .fcounts .minus{color:var(--del)} .fcounts .sep{color:var(--muted)}
+button.fs{font:600 11px/1 ui-monospace,monospace;padding:4px 8px;border-radius:6px;border:1px solid var(--line);
+background:var(--panel);color:var(--muted);cursor:pointer;white-space:nowrap}
+button.fs:hover{border-color:var(--accent);color:var(--accent)}
+/* tab-fullscreen overlay: covers the viewport, not the browser chrome */
+.fs-overlay{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;flex-direction:column;
+padding:18px 32px 24px}
+.fs-overlay.open{display:flex}
+.fs-head{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line);
+margin-bottom:14px;flex-wrap:wrap}
+.fs-head .fpath{font-size:14px}
+.fs-close{margin-left:auto;font:600 12px/1 inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);
+background:var(--panel);color:var(--ink);cursor:pointer}
+.fs-close:hover{border-color:var(--accent);color:var(--accent)}
+.fs-overlay .diff{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:12px;
+background:var(--panel2);font-size:14px}
 /* side-by-side diff: 4-column grid (old-ln | old-code | new-ln | new-code) */
-.diff{overflow-x:auto;border-top:1px solid var(--line);font-size:13px;line-height:1.5}
-.dl{display:grid;grid-template-columns:4em minmax(0,1fr) 4em minmax(0,1fr);min-width:max-content}
+.diff{overflow-x:auto;border-top:1px solid var(--line);font-size:13px;line-height:1.5;
+scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 45%,transparent) transparent}
+/* styled webkit scrollbars are classic (always visible), not macOS overlay */
+.diff::-webkit-scrollbar{width:10px;height:10px}
+.diff::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--muted) 45%,transparent);border-radius:5px;
+border:2px solid transparent;background-clip:content-box}
+.diff::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--muted) 70%,transparent);
+border:2px solid transparent;background-clip:content-box}
+.diff::-webkit-scrollbar-track{background:transparent}
+.dl{display:grid;grid-template-columns:4em minmax(0,1fr) 4em minmax(0,1fr);min-width:0}
+/* add-only hunks have an empty old pane; collapse it so code gets full width */
+.dl-own{grid-template-columns:0 0 4em minmax(0,1fr)}
 .dl .ln{text-align:right;padding:0 10px;color:var(--muted);user-select:none;font-size:11px;
-background:color-mix(in srgb,var(--panel2) 55%,transparent);border-right:1px solid var(--line);
+background:inherit;border-right:1px solid var(--line);
 position:sticky;left:0}
 .dl .ln:nth-child(3){left:auto}
-.dl .code{padding:0 12px;white-space:pre;color:var(--code);font-family:inherit}
+/* gutter must be opaque: content scrolls beneath the sticky old-ln column.
+   light row tints are opaque hex; dark tints are translucent, so pin solid. */
+:root[data-theme=dark] .dl .ln{background:var(--panel2)}
+.dl .code{padding:0 12px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--code);font-family:inherit}
 .dl-add{background:var(--add-bg)} .dl-add .code{color:var(--add)}
 .dl-del{background:var(--del-bg)} .dl-del .code{color:var(--del)}
 .dl-ctx .code{color:var(--muted)}
@@ -133,18 +161,11 @@ background:var(--accent);color:#fff;cursor:pointer}
 button.next:hover{filter:brightness(1.1)}
 footer{padding:30px;text-align:center;color:var(--muted);font-size:13px}
 @media (max-width:900px){.layout{flex-direction:column;padding:0 14px}
+header.top{padding:12px 14px}
 #rail{position:static;width:auto;max-height:none}#steps{display:flex;flex-wrap:wrap;gap:4px}
 #steps::before{display:none}.step{width:auto}.dot{display:none}}
 @media print{header.top,#rail,.next-wrap,button{display:none!important}.concept{break-inside:avoid;
 box-shadow:none}.layout{display:block;max-width:none;padding:0}}
-"""
-
-# dark mode: plain row colors inside tinted add/del rows - per-token syntax
-# colors clash with the green/red tint (GitHub renders diffs unhighlighted).
-# Must beat the scoped pygments rules, so: appended AFTER pyg_css + !important.
-DARK_ROW_OVERRIDES = """
-:root[data-theme=dark] .diff .dl-add .code span{color:inherit!important}
-:root[data-theme=dark] .diff .dl-del .code span{color:inherit!important}
 """
 
 JS = """
@@ -158,12 +179,47 @@ JS = """
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)setActive(+e.target.dataset.index)})},
     {rootMargin:'-30% 0px -60% 0px'});
   cards.forEach(function(c){io.observe(c)});
+  setActive(0);
   steps.forEach(function(s){s.addEventListener('click',function(){goto(+s.dataset.index)})});
   document.querySelectorAll('.next').forEach(function(b){b.addEventListener('click',function(){goto(+b.dataset.next)})});
   document.addEventListener('keydown',function(e){
+    if(fsOpen()){
+      if(e.key==='Escape'){fsClose();e.preventDefault();}
+      return;
+    }
     if(e.target.closest('details,textarea,input,[contenteditable]'))return;
     if(e.key==='j'||e.key==='ArrowDown'){e.preventDefault();goto(Math.min(cur+1,cards.length-1));}
     if(e.key==='k'||e.key==='ArrowUp'){e.preventDefault();goto(Math.max(cur-1,0));}
+  });
+  // per-hunk fullscreen: covers the tab (overlay), not the browser
+  var fsOverlay=null;
+  function fsOpen(){return !!fsOverlay&&fsOverlay.classList.contains('open')}
+  function fsClose(){if(fsOverlay)fsOverlay.classList.remove('open')}
+  function fsShow(hunk){
+    if(!fsOverlay){
+      fsOverlay=document.createElement('div');
+      fsOverlay.className='fs-overlay';
+      fsOverlay.innerHTML='<div class="fs-head"><span class="badge"></span><span class="fpath"></span>'
+        +'<span class="fcounts"></span><button class="fs-close" type="button">Close</button></div>';
+      fsOverlay.querySelector('.fs-close').addEventListener('click',fsClose);
+      document.body.appendChild(fsOverlay);
+    }
+    var head=fsOverlay.querySelector('.fs-head');
+    var badge=hunk.querySelector('.badge');
+    var hb=head.querySelector('.badge');
+    hb.className='badge '+badge.className.split(' ')[1];
+    hb.textContent=badge.textContent;
+    head.querySelector('.fpath').textContent=hunk.querySelector('.fpath').textContent;
+    head.querySelector('.fcounts').innerHTML=hunk.querySelector('.fcounts').innerHTML;
+    var old=fsOverlay.querySelector('.diff');
+    if(old)old.remove();
+    fsOverlay.appendChild(hunk.querySelector('.diff').cloneNode(true));
+    fsOverlay.classList.add('open');
+  }
+  document.querySelectorAll('details.hunk').forEach(function(h){
+    h.querySelector('.fs').addEventListener('click',function(e){
+      e.preventDefault();e.stopPropagation();fsShow(h);
+    });
   });
   var bar=document.getElementById('progress');
   window.addEventListener('scroll',function(){var h=document.documentElement;
@@ -232,14 +288,17 @@ def render_hunk_rows(chunk, want_hl):
     lines = chunk.get("content", "").split("\n")
     m = HUNK_RE.match(lines[0]) if lines else None
     old_n, new_n = (int(m.group(1)), int(m.group(3))) if m else (0, 0)
+    cells = []  # (cls, old_ln, new_ln, inner)
+    if m:
+        cells.append(("dl-hunk", "", "", esc(lines[0])))
     for line in lines[1:]:
         if not line:
             continue
         if line.startswith("\\"):
-            rows.append('<div class="dl dl-nl"><span class="code">' + esc(line) + "</span></div>")
+            cells.append(("dl-nl", "", "", esc(line)))
             continue
         if line.startswith("@@"):
-            rows.append('<div class="dl dl-hunk"><span class="code">' + esc(line) + "</span></div>")
+            cells.append(("dl-hunk", "", "", esc(line)))
             continue
         if line.startswith("+"):
             code, cls, old_ln, new_ln = line[1:], "dl-add", "", new_n
@@ -257,26 +316,34 @@ def render_hunk_rows(chunk, want_hl):
             tokens = highlight(code, chunk.get("language", "text"))
             if tokens:
                 inner = tokens
-        if cls == "dl-add":
-            rows.append(f'<div class="dl {cls}"><span class="ln"></span><span class="code"></span>'
+        cells.append((cls, old_ln, new_ln, inner))
+    content_cells = [c for c in cells if c[0] in ("dl-add", "dl-del", "dl-ctx")]
+    own = " dl-own" if content_cells and all(c[0] == "dl-add" for c in content_cells) else ""
+    rows = []
+    for cls, old_ln, new_ln, inner in cells:
+        if cls in ("dl-hunk", "dl-nl"):
+            rows.append(f'<div class="dl {cls}"><span class="code">{inner}</span></div>')
+        elif cls == "dl-add":
+            rows.append(f'<div class="dl {cls}{own}"><span class="ln"></span><span class="code"></span>'
                         f'<span class="ln">{new_ln}</span><span class="code">{inner}</span></div>')
         elif cls == "dl-del":
-            rows.append(f'<div class="dl {cls}"><span class="ln">{old_ln}</span><span class="code">{inner}</span>'
+            rows.append(f'<div class="dl {cls}{own}"><span class="ln">{old_ln}</span><span class="code">{inner}</span>'
                         f'<span class="ln"></span><span class="code"></span></div>')
         else:
-            rows.append(f'<div class="dl {cls}"><span class="ln">{old_ln}</span><span class="code">{inner}</span>'
+            rows.append(f'<div class="dl {cls}{own}"><span class="ln">{old_ln}</span><span class="code">{inner}</span>'
                         f'<span class="ln">{new_ln}</span><span class="code">{inner}</span></div>')
     return "\n".join(rows)
 
 
-def render_hunk(chunk, want_hl):
+def render_hunk(chunk, want_hl, open_=False):
     badge, bcls = STATUS_META.get(chunk.get("status", "modified"), ("M", "mod"))
     rows = render_hunk_rows(chunk, want_hl)
-    return (f'<details class="hunk"><summary><span class="caret">&#9654;</span>'
+    return (f'<details class="hunk"{" open" if open_ else ""}><summary><span class="caret">&#9654;</span>'
             f'<span class="badge {bcls}">{badge}</span>'
             f'<span class="fpath">{esc(chunk["file"])}</span>'
             f'<span class="fcounts"><span class="plus">+{chunk.get("added", 0)}</span>'
             f'<span class="sep"> </span><span class="minus">-{chunk.get("removed", 0)}</span></span>'
+            f'<button class="fs" type="button" title="Open hunk fullscreen">Fullscreen</button>'
             f'</summary><div class="diff">{rows}</div></details>')
 
 
@@ -286,7 +353,8 @@ def main():
     ap.add_argument("--concepts", required=True, help="concepts.json (agent-authored)")
     ap.add_argument("--title", default="Diff Intent Timeline")
     ap.add_argument("--subtitle", default="")
-    ap.add_argument("--out", default="diff-timeline.html")
+    ap.add_argument("--out", default=None,
+                    help="output HTML path (default: timeline.html next to --chunks)")
     ap.add_argument("--no-highlight", action="store_true")
     args = ap.parse_args()
 
@@ -306,7 +374,7 @@ def main():
                                  ":root[data-theme=dark]"))
         except Exception:
             pyg_css = ""
-    css_block = CSS + ("\n" + pyg_css if pyg_css else "") + DARK_ROW_OVERRIDES
+    css_block = CSS + ("\n" + pyg_css if pyg_css else "")
 
     by_id = {c["id"]: c for c in chunks}
     assigned = set()
@@ -330,7 +398,7 @@ def main():
         }]
 
     rail_steps, body = [], []
-    for conept in concepts:
+    for i, conept in enumerate(concepts):
         n = conept["id"]
         chunks_in = [by_id[cid] for cid in conept.get("chunks", []) if cid in by_id]
         missing = [cid for cid in conept.get("chunks", []) if cid not in by_id]
@@ -341,7 +409,7 @@ def main():
         dep_txt = "builds on " + ", ".join(f"#{d}" for d in deps) if deps else "foundation"
         first_open = n == 1 and len(chunks_in) <= 4
         hunks = "\n".join(
-            render_hunk(c, not args.no_highlight) for c in chunks_in)
+            render_hunk(c, not args.no_highlight, open_=first_open) for c in chunks_in)
         if missing:
             hunks += (f'<div class="intent">[warn] missing chunks: {esc(", ".join(missing))}</div>')
         meta = (f'<span class="chip sm">{len(files)} file{"s" if len(files) != 1 else ""}</span>'
@@ -350,14 +418,18 @@ def main():
                 f'<span class="chip sm">{len(chunks_in)} hunk{"s" if len(chunks_in) != 1 else ""}</span>'
                 f'<span class="chip sm">{esc(dep_txt)}</span>')
         rail_steps.append(
-            f'<li><button class="step" data-index="{n}"><span class="dot">{n}</span>'
+            f'<li><button class="step" data-index="{i}"><span class="dot">{n}</span>'
             f'<span class="sname">{esc(conept["name"])}</span></button></li>')
-        body.append(f'''<article class="concept" id="concept-{n}" data-index="{n}">
+        is_last = i == len(concepts) - 1
+        next_btn = ("" if is_last else
+                    f'<div class="next-wrap"><button class="next" data-next="{i + 1}">'
+                    f'Next concept &#8595;</button></div>')
+        body.append(f'''<article class="concept" id="concept-{n}" data-index="{i}">
 <div class="c-head"><div class="c-num">{n}</div><div class="c-titles">
 <h2>{esc(conept["name"])}</h2><div class="c-meta">{meta}</div></div></div>
 <p class="intent"><span class="why">Why this exists</span>{esc(conept.get("intent", ""))}</p>
 <div class="hunks">{hunks}</div>
-<div class="next-wrap"><button class="next" data-next="{n + 1}">Next concept &#8595;</button></div>
+{next_btn}
 </article>''')
 
     subtitle = args.subtitle or ""
@@ -377,9 +449,9 @@ def main():
     if data.get("overview"):
         overview = (f'<section class="overview"><h2>Overview</h2><p>{esc(data["overview"])}</p></section>')
 
-    body_html = ("<main>" + overview + "\n".join(body) +
-                 "</main><footer>diff-intent-timeline &middot; single-file review page"
-                 " &middot; generated from chunks.json + concepts.json</footer>")
+    body_html = "<main>" + overview + "\n".join(body) + "</main>"
+    footer = ("<footer>diff-intent-timeline &middot; single-file review page"
+              " &middot; generated from chunks.json + concepts.json</footer>")
 
     html_doc = ("""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -395,16 +467,19 @@ def main():
 <ol id="steps">__STEPS__</ol></nav>
 __BODY__
 </div>
+__FOOTER__
 <script>__JS__</script></body></html>""")
     html_doc = (html_doc.replace("__TITLE__", esc(args.title))
                 .replace("__SUBTITLE__", subtitle)
                 .replace("__CHIPS__", chips)
                 .replace("__STEPS__", "\n".join(rail_steps))
                 .replace("__BODY__", body_html)
+                .replace("__FOOTER__", footer)
                 .replace("__CSS__", css_block)
                 .replace("__JS__", JS))
-    Path(args.out).write_text(html_doc, encoding="utf-8")
-    print(f"wrote {Path(args.out).resolve()}")
+    out_path = Path(args.out) if args.out else (Path(args.chunks).resolve().parent / "timeline.html")
+    out_path.write_text(html_doc, encoding="utf-8")
+    print(f"wrote {out_path.resolve()}")
 
 
 if __name__ == "__main__":

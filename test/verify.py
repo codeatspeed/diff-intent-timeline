@@ -154,8 +154,8 @@ try:
     check("pygments token spans", len(re.findall(r'class="(?:kd|nx|s1|c1|mi|o|w)"', src)) > 20)
     check("light palette scoped", ":root:not([data-theme=dark]) .diff .k" in src)
     check("dark palette scoped (monokai)", ":root[data-theme=dark] .diff .k" in src)
-    check("dark plain-row override beats tokens",
-          ":root[data-theme=dark] .diff .dl-del .code span{color:inherit!important}" in src)
+    check("dark mode keeps per-token colors",
+          ":root[data-theme=dark] .diff .dl-del .code span{color:inherit!important}" not in src)
 except ImportError:
     print("SKIP pygments checks (not installed)")
 

@@ -19,6 +19,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$")
@@ -189,7 +190,9 @@ def main():
     ap.add_argument("--context", type=int, default=3, help="context lines (default 3)")
     ap.add_argument("--max-chunk-bytes", type=int, default=6000,
                     help="per-hunk content cap (default 6000)")
-    ap.add_argument("--out", default=".", help="output dir (default: cwd)")
+    ap.add_argument("--out", default=None,
+                    help="output dir (default: per-run work dir under ~/.cache/diff-intent-timeline; "
+                         "pass --out to write into the repo instead)")
     args = ap.parse_args()
 
     diff_text = get_diff(args)
@@ -197,7 +200,12 @@ def main():
         sys.exit("no diff produced - check refs (empty repo? identical trees?)")
 
     chunks, files_out, skipped = parse(diff_text, args.max_chunk_bytes)
-    out = Path(args.out)
+    if args.out:
+        out = Path(args.out)
+    else:
+        cache = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+        slug = os.path.basename(os.path.abspath(args.repo)) if args.repo else "diff"
+        out = cache / "diff-intent-timeline" / f"{slug}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     out.mkdir(parents=True, exist_ok=True)
 
     langs = {}
