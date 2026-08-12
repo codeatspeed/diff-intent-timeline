@@ -1,6 +1,6 @@
 ---
 name: diff-intent-timeline
-description: Render git diffs as HTML intent-timeline review pages: hunks clustered into concepts, ordered foundation-first. Use when a large PR, commit, or raw diff needs intent-ordered review, or the user asks for a timeline by intent, concept clustering, or a diff explained as a story.
+description: Render git diffs as HTML intent-timeline review pages - hunks clustered into concepts, ordered foundation-first. Use when a large PR, commit, or raw diff needs intent-ordered review, or the user asks for a timeline by intent, concept clustering, or a diff explained as a story.
 ---
 
 # Diff Intent Timeline
