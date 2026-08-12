@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>orders-service: implement order placement flow</title><style>
+:root{--bg:#f6f5f2;--panel:#fff;--panel2:#fbfaf7;--ink:#1c1b19;--muted:#6f6b63;
+--line:#e6e3db;--accent:#4f46e5;--accent-soft:#eef0ff;--add:#15803d;--add-bg:#f0fdf4;
+--del:#b91c1c;--del-bg:#fef2f2;--hunk:#7c3aed;--hunk-bg:#f6f1fd;--code:#141310;
+--rail:#f0efeb;--shadow:0 1px 2px rgba(20,19,16,.06)}
+:root[data-theme=dark]{--bg:#0e1013;--panel:#15181d;--panel2:#12151a;--ink:#e7e5e2;
+--muted:#8b8780;--line:#262b33;--accent:#818cf8;--accent-soft:rgba(99,102,241,.15);
+--add:#4ade80;--add-bg:rgba(74,222,128,.10);--del:#f87171;--del-bg:rgba(248,113,113,.10);
+--hunk:#c4b5fd;--hunk-bg:rgba(139,92,246,.12);--code:#e7e5e2;--rail:#111419;
+--shadow:0 1px 2px rgba(0,0,0,.4)}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",
+Roboto,"Inter","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+code,kbd,.mono{font-family:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace}
+#progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:60;transition:width .08s linear}
+header.top{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 88%,transparent);
+backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 22px}
+.top-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;max-width:1180px;margin:0 auto}
+h1{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.subtitle{color:var(--muted);font-size:12.5px;margin-top:2px;max-width:640px;overflow:hidden;
+text-overflow:ellipsis;white-space:nowrap}
+.chips{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--panel);
+border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.chip b{color:var(--ink)}
+.chip .plus{color:var(--add)} .chip .minus{color:var(--del)}
+button.ctl{font:600 12.5px/1 inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);
+background:var(--panel);color:var(--ink);cursor:pointer}
+button.ctl:hover{border-color:var(--accent);color:var(--accent)}
+.layout{display:flex;gap:28px;max-width:1180px;margin:26px auto 80px;padding:0 22px}
+#rail{width:248px;flex:none;position:sticky;top:78px;align-self:flex-start;max-height:calc(100vh - 100px);
+overflow:auto;background:var(--rail);border:1px solid var(--line);border-radius:14px;padding:14px 12px}
+.rail-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+padding:2px 8px 10px}
+#steps{list-style:none;position:relative}
+#steps::before{content:"";position:absolute;left:15px;top:10px;bottom:10px;width:2px;background:var(--line)}
+.step{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;
+padding:7px 8px;border-radius:9px;cursor:pointer;position:relative}
+.step:hover{background:var(--panel)}
+.step.active{background:var(--panel);box-shadow:var(--shadow)}
+.dot{flex:none;width:22px;height:22px;border-radius:50%;background:var(--panel);border:2px solid var(--line);
+color:var(--muted);font:700 11px/18px ui-monospace,monospace;text-align:center;position:relative;z-index:1}
+.step.active .dot{background:var(--accent);border-color:var(--accent);color:#fff}
+.sname{font-size:12.5px;font-weight:600;line-height:1.35;padding-top:2px}
+.step.active .sname{color:var(--accent)}
+.sdep{display:block;font-size:10.5px;color:var(--muted);font-weight:500;margin-top:1px}
+main{flex:1;min-width:0;max-width:880px}
+.overview{background:linear-gradient(135deg,var(--accent-soft),transparent 60%);border:1px solid var(--line);
+border-left:3px solid var(--accent);border-radius:14px;padding:20px 22px;margin-bottom:26px}
+.overview h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.overview p{font-size:14.5px;color:var(--ink)}
+.concept{background:var(--panel);border:1px solid var(--line);border-radius:16px;margin:0 0 30px;
+overflow:hidden;box-shadow:var(--shadow)}
+.c-head{display:flex;gap:16px;padding:18px 22px 0;align-items:flex-start}
+.c-num{flex:none;width:38px;height:38px;border-radius:11px;background:var(--accent);color:#fff;
+font:700 17px/38px ui-monospace,monospace;text-align:center;box-shadow:0 2px 8px rgba(79,70,229,.35)}
+.c-titles{min-width:0}
+.c-titles h2{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.c-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.chip.sm{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);
+color:var(--muted);font-weight:600}
+.chip.sm .plus{color:var(--add)} .chip.sm .minus{color:var(--del)}
+.intent{margin:14px 22px 0;padding:12px 16px;background:var(--accent-soft);border-left:3px solid var(--accent);
+border-radius:0 10px 10px 0;font-size:14px;color:var(--ink)}
+.intent .why{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);
+display:block;margin-bottom:3px}
+.hunks{padding:14px 22px 20px}
+details.hunk{border:1px solid var(--line);border-radius:10px;margin-top:10px;background:var(--panel2);
+overflow:hidden}
+details.hunk[open]{box-shadow:var(--shadow)}
+details.hunk summary{display:flex;gap:10px;align-items:center;cursor:pointer;padding:9px 14px;
+list-style:none;user-select:none}
+details.hunk summary::-webkit-details-marker{display:none}
+summary .caret{color:var(--muted);font-size:11px;transition:transform .15s;width:10px}
+details.hunk[open] summary .caret{transform:rotate(90deg)}
+.badge{flex:none;font:700 10px/1 ui-monospace,monospace;padding:3px 7px;border-radius:5px}
+.badge.add{background:var(--add-bg);color:var(--add);border:1px solid color-mix(in srgb,var(--add) 30%,transparent)}
+.badge.mod{background:rgba(245,158,11,.12);color:#b45309;border:1px solid rgba(245,158,11,.35)}
+:root[data-theme=dark] .badge.mod{color:#fbbf24}
+.badge.del{background:var(--del-bg);color:var(--del);border:1px solid color-mix(in srgb,var(--del) 30%,transparent)}
+.badge.ren{background:rgba(139,92,246,.12);color:var(--hunk);border:1px solid color-mix(in srgb,var(--hunk) 35%,transparent)}
+.fpath{font:600 12.5px/1.4 ui-monospace,monospace;word-break:break-all}
+.fcounts{margin-left:auto;font:600 11px ui-monospace,monospace;white-space:nowrap}
+.fcounts .plus{color:var(--add)} .fcounts .minus{color:var(--del)} .fcounts .sep{color:var(--muted)}
+.diff{overflow-x:auto;border-top:1px solid var(--line);font-size:12.5px;line-height:1.5}
+.dl{display:grid;grid-template-columns:3.6em 1fr;min-width:max-content}
+.ln{grid-column:1;text-align:right;padding:0 10px;color:var(--muted);background:color-mix(in srgb,var(--panel2) 60%,transparent);
+border-right:1px solid var(--line);user-select:none;font-size:11px}
+.code{grid-column:2;padding:0 12px;white-space:pre;color:var(--code);font-family:inherit}
+.dl-add .ln,.dl-del .ln{font-weight:600}
+.dl-add{background:var(--add-bg)} .dl-add .code{color:var(--add)}
+.dl-del{background:var(--del-bg)} .dl-del .code{color:var(--del)}
+.dl-ctx .code{color:var(--muted)}
+.dl-hunk{background:var(--hunk-bg)}
+.dl-hunk .ln{color:var(--hunk)} .dl-hunk .code{color:var(--hunk);font-weight:600}
+.pfx{display:inline-block;width:1em;font-weight:700;user-select:none}
+.dl-add .pfx{color:var(--add)} .dl-del .pfx{color:var(--del)}
+.dl-nl{background:transparent} .dl-nl .code{color:var(--muted);font-style:italic}
+.next-wrap{display:flex;justify-content:flex-end;padding:0 22px 18px}
+button.next{font:600 12.5px/1 inherit;padding:8px 14px;border-radius:9px;border:1px solid var(--accent);
+background:var(--accent);color:#fff;cursor:pointer}
+button.next:hover{filter:brightness(1.1)}
+footer{padding:30px;text-align:center;color:var(--muted);font-size:12px}
+@media (max-width:860px){.layout{flex-direction:column;padding:0 14px}
+#rail{position:static;width:auto;max-height:none}#steps{display:flex;flex-wrap:wrap;gap:4px}
+#steps::before{display:none}.step{width:auto}.dot{display:none}}
+@media print{header.top,#rail,.next-wrap,button{display:none!important}.concept{break-inside:avoid;
+box-shadow:none}.layout{display:block;max-width:none;padding:0}}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: #666666; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #666666; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.diff .hll { background-color: #ffffcc }
+.diff { background: #f0f0f0; }
+.diff .c { color: #60A0B0; font-style: italic } /* Comment */
+.diff .err { border: 1px solid #F00 } /* Error */
+.diff .k { color: #007020; font-weight: bold } /* Keyword */
+.diff .o { color: #666 } /* Operator */
+.diff .ch { color: #60A0B0; font-style: italic } /* Comment.Hashbang */
+.diff .cm { color: #60A0B0; font-style: italic } /* Comment.Multiline */
+.diff .cp { color: #007020 } /* Comment.Preproc */
+.diff .cpf { color: #60A0B0; font-style: italic } /* Comment.PreprocFile */
+.diff .c1 { color: #60A0B0; font-style: italic } /* Comment.Single */
+.diff .cs { color: #60A0B0; background-color: #FFF0F0 } /* Comment.Special */
+.diff .gd { color: #A00000 } /* Generic.Deleted */
+.diff .ge { font-style: italic } /* Generic.Emph */
+.diff .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.diff .gr { color: #F00 } /* Generic.Error */
+.diff .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.diff .gi { color: #00A000 } /* Generic.Inserted */
+.diff .go { color: #888 } /* Generic.Output */
+.diff .gp { color: #C65D09; font-weight: bold } /* Generic.Prompt */
+.diff .gs { font-weight: bold } /* Generic.Strong */
+.diff .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.diff .gt { color: #04D } /* Generic.Traceback */
+.diff .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.diff .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.diff .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.diff .kp { color: #007020 } /* Keyword.Pseudo */
+.diff .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.diff .kt { color: #902000 } /* Keyword.Type */
+.diff .m { color: #40A070 } /* Literal.Number */
+.diff .s { color: #4070A0 } /* Literal.String */
+.diff .na { color: #4070A0 } /* Name.Attribute */
+.diff .nb { color: #007020 } /* Name.Builtin */
+.diff .nc { color: #0E84B5; font-weight: bold } /* Name.Class */
+.diff .no { color: #60ADD5 } /* Name.Constant */
+.diff .nd { color: #555; font-weight: bold } /* Name.Decorator */
+.diff .ni { color: #D55537; font-weight: bold } /* Name.Entity */
+.diff .ne { color: #007020 } /* Name.Exception */
+.diff .nf { color: #06287E } /* Name.Function */
+.diff .nl { color: #002070; font-weight: bold } /* Name.Label */
+.diff .nn { color: #0E84B5; font-weight: bold } /* Name.Namespace */
+.diff .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.diff .nv { color: #BB60D5 } /* Name.Variable */
+.diff .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.diff .w { color: #BBB } /* Text.Whitespace */
+.diff .mb { color: #40A070 } /* Literal.Number.Bin */
+.diff .mf { color: #40A070 } /* Literal.Number.Float */
+.diff .mh { color: #40A070 } /* Literal.Number.Hex */
+.diff .mi { color: #40A070 } /* Literal.Number.Integer */
+.diff .mo { color: #40A070 } /* Literal.Number.Oct */
+.diff .sa { color: #4070A0 } /* Literal.String.Affix */
+.diff .sb { color: #4070A0 } /* Literal.String.Backtick */
+.diff .sc { color: #4070A0 } /* Literal.String.Char */
+.diff .dl { color: #4070A0 } /* Literal.String.Delimiter */
+.diff .sd { color: #4070A0; font-style: italic } /* Literal.String.Doc */
+.diff .s2 { color: #4070A0 } /* Literal.String.Double */
+.diff .se { color: #4070A0; font-weight: bold } /* Literal.String.Escape */
+.diff .sh { color: #4070A0 } /* Literal.String.Heredoc */
+.diff .si { color: #70A0D0; font-style: italic } /* Literal.String.Interpol */
+.diff .sx { color: #C65D09 } /* Literal.String.Other */
+.diff .sr { color: #235388 } /* Literal.String.Regex */
+.diff .s1 { color: #4070A0 } /* Literal.String.Single */
+.diff .ss { color: #517918 } /* Literal.String.Symbol */
+.diff .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.diff .fm { color: #06287E } /* Name.Function.Magic */
+.diff .vc { color: #BB60D5 } /* Name.Variable.Class */
+.diff .vg { color: #BB60D5 } /* Name.Variable.Global */
+.diff .vi { color: #BB60D5 } /* Name.Variable.Instance */
+.diff .vm { color: #BB60D5 } /* Name.Variable.Magic */
+.diff .il { color: #40A070 } /* Literal.Number.Integer.Long */
+:root[data-theme=dark] .diff .kd,:root[data-theme=dark] .diff .kn,
+:root[data-theme=dark] .diff .kw,:root[data-theme=dark] .diff .kc,
+:root[data-theme=dark] .diff .kt,:root[data-theme=dark] .diff .kr,
+:root[data-theme=dark] .diff .k{color:#ff7b72}
+:root[data-theme=dark] .diff .s,:root[data-theme=dark] .diff .s1,
+:root[data-theme=dark] .diff .s2,:root[data-theme=dark] .diff .sr,
+:root[data-theme=dark] .diff .sb,:root[data-theme=dark] .diff .sc{color:#a5d6ff}
+:root[data-theme=dark] .diff .c,:root[data-theme=dark] .diff .c1,
+:root[data-theme=dark] .diff .cm,:root[data-theme=dark] .diff .cc{color:#8b949e}
+:root[data-theme=dark] .diff .mi,:root[data-theme=dark] .diff .mf,
+:root[data-theme=dark] .diff .mh,:root[data-theme=dark] .diff .il,
+:root[data-theme=dark] .diff .mo,:root[data-theme=dark] .diff .mb{color:#79c0ff}
+:root[data-theme=dark] .diff .na,:root[data-theme=dark] .diff .nb,
+:root[data-theme=dark] .diff .nx{color:#d2a8ff}
+</style></head>
+<body><div id="progress"></div>
+<header class="top"><div class="top-row">
+<div><h1>orders-service: implement order placement flow</h1><div class="subtitle">/tmp/dit-fixture  &middot;  commit HEAD</div></div>
+<div class="chips"><span class="chip"><b>6</b> concepts</span><span class="chip"><b>6</b> hunks</span><span class="chip"><b class="plus">+111</b> <b class="minus">-1</b></span><button class="ctl" id="expand-all">Expand all</button>
+<button class="ctl" id="theme">Dark</button></div>
+</div></header>
+<div class="layout"><nav id="rail"><div class="rail-title">Timeline &middot; review order</div>
+<ol id="steps"><li><button class="step" data-index="1"><span class="dot">1</span><span class="sname">Orders schema</span></button></li>
+<li><button class="step" data-index="2"><span class="dot">2</span><span class="sname">DB access layer</span></button></li>
+<li><button class="step" data-index="3"><span class="dot">3</span><span class="sname">Order domain logic</span></button></li>
+<li><button class="step" data-index="4"><span class="dot">4</span><span class="sname">HTTP API</span></button></li>
+<li><button class="step" data-index="5"><span class="dot">5</span><span class="sname">Domain test</span></button></li>
+<li><button class="step" data-index="6"><span class="dot">6</span><span class="sname">Endpoint docs</span></button></li></ol></nav>
+<main><section class="overview"><h2>Overview</h2><p>Adds the full order placement flow to the skeleton service: a Postgres schema for orders and line items, a thin DB access layer, domain functions for creating and reading orders, HTTP endpoints wired to the domain, a test, and endpoint docs.</p></section><article class="concept" id="concept-1" data-index="1">
+<div class="c-head"><div class="c-num">1</div><div class="c-titles">
+<h2>Orders schema</h2><div class="c-meta"><span class="chip sm">1 file</span><span class="chip sm"><span class="plus">+17</span><span class="sep"> </span><span class="minus">-0</span></span><span class="chip sm">1 hunk</span><span class="chip sm">foundation</span></div></div></div>
+<p class="intent"><span class="why">Why this exists</span>The service has no persistence yet. These two tables are the storage contract: orders with total_cents kept in integer cents (no float money), order_items with a quantity check and a cascade delete so an order&#x27;s items never outlive it, plus a customer lookup index.</p>
+<div class="hunks"><details class="hunk"><summary><span class="caret">&#9654;</span><span class="badge add">A</span><span class="fpath">b/db/schema.sql</span><span class="fcounts"><span class="plus">+17</span><span class="sep"> </span><span class="minus">-0</span></span></summary><div class="diff"><div class="dl dl-add"><span class="ln">1</span><span class="code"><span class="pfx">a</span><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">orders</span><span class="w"> </span><span class="p">(</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">2</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="n">id</span><span class="w"> </span><span class="n">BIGSERIAL</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">3</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="n">customer_id</span><span class="w"> </span><span class="nb">BIGINT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">4</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="n">status</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">&#39;pending&#39;</span><span class="p">,</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">5</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="n">total_cents</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">6</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="n">created_at</span><span class="w"> </span><span class="n">TIMESTAMPTZ</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="n">now</span><span class="p">()</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">7</span><span class="code"><span class="pfx">a</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">8</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">9</span><span class="code"><span class="pfx">a</span><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">order_items</span><span class="w"> </span><span class="p">(</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">10</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="n">id</span><span class="w"> </span><span class="n">BIGSERIAL</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">11</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="n">order_id</span><span class="w"> </span><span class="nb">BIGINT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">orders</span><span class="p">(</span><span class="n">id</span><span class="p">)</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">DELETE</span><span class="w"> </span><span class="k">CASCADE</span><span class="p">,</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">12</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="n">sku</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">13</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="n">quantity</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">CHECK</span><span class="w"> </span><span class="p">(</span><span class="n">quantity</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">),</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">14</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="n">unit_price_cents</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">15</span><span class="code"><span class="pfx">a</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">16</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">17</span><span class="code"><span class="pfx">a</span><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">orders_customer_idx</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">orders</span><span class="w"> </span><span class="p">(</span><span class="n">customer_id</span><span class="p">);</span>
+</span></div></div></details></div>
+<div class="next-wrap"><button class="next" data-next="2">Next concept &#8595;</button></div>
+</article>
+<article class="concept" id="concept-2" data-index="2">
+<div class="c-head"><div class="c-num">2</div><div class="c-titles">
+<h2>DB access layer</h2><div class="c-meta"><span class="chip sm">1 file</span><span class="chip sm"><span class="plus">+11</span><span class="sep"> </span><span class="minus">-0</span></span><span class="chip sm">1 hunk</span><span class="chip sm">builds on #1</span></div></div></div>
+<p class="intent"><span class="why">Why this exists</span>One place that owns the pg Pool and the connection string, so nothing else in the app imports pg or knows about connection config.</p>
+<div class="hunks"><details class="hunk"><summary><span class="caret">&#9654;</span><span class="badge add">A</span><span class="fpath">b/src/db.js</span><span class="fcounts"><span class="plus">+11</span><span class="sep"> </span><span class="minus">-0</span></span></summary><div class="diff"><div class="dl dl-add"><span class="ln">1</span><span class="code"><span class="pfx">a</span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Pool</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s2">&quot;pg&quot;</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">2</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">3</span><span class="code"><span class="pfx">a</span><span class="kd">const</span><span class="w"> </span><span class="nx">pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Pool</span><span class="p">({</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">4</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="nx">connectionString</span><span class="o">:</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">DATABASE_URL</span><span class="p">,</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">5</span><span class="code"><span class="pfx">a</span><span class="p">});</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">6</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">7</span><span class="code"><span class="pfx">a</span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">query</span><span class="p">(</span><span class="nx">text</span><span class="p">,</span><span class="w"> </span><span class="nx">params</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">8</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">pool</span><span class="p">.</span><span class="nx">query</span><span class="p">(</span><span class="nx">text</span><span class="p">,</span><span class="w"> </span><span class="nx">params</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">9</span><span class="code"><span class="pfx">a</span><span class="p">}</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">10</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">11</span><span class="code"><span class="pfx">a</span><span class="nx">module</span><span class="p">.</span><span class="nx">exports</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">query</span><span class="p">,</span><span class="w"> </span><span class="nx">pool</span><span class="w"> </span><span class="p">};</span>
+</span></div></div></details></div>
+<div class="next-wrap"><button class="next" data-next="3">Next concept &#8595;</button></div>
+</article>
+<article class="concept" id="concept-3" data-index="3">
+<div class="c-head"><div class="c-num">3</div><div class="c-titles">
+<h2>Order domain logic</h2><div class="c-meta"><span class="chip sm">1 file</span><span class="chip sm"><span class="plus">+27</span><span class="sep"> </span><span class="minus">-0</span></span><span class="chip sm">1 hunk</span><span class="chip sm">builds on #2</span></div></div></div>
+<p class="intent"><span class="why">Why this exists</span>createOrder computes the total from line items, inserts the order then its items, and returns the persisted order; getOrder fetches an order with its items. Domain rules (pricing math, item lookup) live here, not in the HTTP layer.</p>
+<div class="hunks"><details class="hunk"><summary><span class="caret">&#9654;</span><span class="badge add">A</span><span class="fpath">b/src/orders.js</span><span class="fcounts"><span class="plus">+27</span><span class="sep"> </span><span class="minus">-0</span></span></summary><div class="diff"><div class="dl dl-add"><span class="ln">1</span><span class="code"><span class="pfx">a</span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">query</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s2">&quot;./db&quot;</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">2</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">3</span><span class="code"><span class="pfx">a</span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">createOrder</span><span class="p">(</span><span class="nx">customerId</span><span class="p">,</span><span class="w"> </span><span class="nx">items</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">4</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">totalCents</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">items</span><span class="p">.</span><span class="nx">reduce</span><span class="p">(</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">5</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="p">(</span><span class="nx">sum</span><span class="p">,</span><span class="w"> </span><span class="nx">it</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">sum</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nx">it</span><span class="p">.</span><span class="nx">quantity</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">it</span><span class="p">.</span><span class="nx">unitPriceCents</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">6</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">query</span><span class="p">(</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">7</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="s2">&quot;INSERT INTO orders (customer_id, total_cents) VALUES ($1, $2) RETURNING id, status, created_at&quot;</span><span class="p">,</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">8</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="p">[</span><span class="nx">customerId</span><span class="p">,</span><span class="w"> </span><span class="nx">totalCents</span><span class="p">]);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">9</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">orderId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">rows</span><span class="p">[</span><span class="mf">0</span><span class="p">].</span><span class="nx">id</span><span class="p">;</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">10</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kd">const</span><span class="w"> </span><span class="nx">it</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="nx">items</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">11</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="nx">query</span><span class="p">(</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">12</span><span class="code"><span class="pfx">a</span><span class="w">      </span><span class="s2">&quot;INSERT INTO order_items (order_id, sku, quantity, unit_price_cents) VALUES ($1, $2, $3, $4)&quot;</span><span class="p">,</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">13</span><span class="code"><span class="pfx">a</span><span class="w">      </span><span class="p">[</span><span class="nx">orderId</span><span class="p">,</span><span class="w"> </span><span class="nx">it</span><span class="p">.</span><span class="nx">sku</span><span class="p">,</span><span class="w"> </span><span class="nx">it</span><span class="p">.</span><span class="nx">quantity</span><span class="p">,</span><span class="w"> </span><span class="nx">it</span><span class="p">.</span><span class="nx">unitPriceCents</span><span class="p">]);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">14</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="p">}</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">15</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">getOrder</span><span class="p">(</span><span class="nx">orderId</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">16</span><span class="code"><span class="pfx">a</span><span class="p">}</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">17</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">18</span><span class="code"><span class="pfx">a</span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getOrder</span><span class="p">(</span><span class="nx">orderId</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">19</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">order</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">query</span><span class="p">(</span><span class="s2">&quot;SELECT * FROM orders WHERE id = $1&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="nx">orderId</span><span class="p">]);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">20</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">order</span><span class="p">.</span><span class="nx">rows</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">21</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">items</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">query</span><span class="p">(</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">22</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="s2">&quot;SELECT sku, quantity, unit_price_cents FROM order_items WHERE order_id = $1&quot;</span><span class="p">,</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">23</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="p">[</span><span class="nx">orderId</span><span class="p">]);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">24</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="nx">order</span><span class="p">.</span><span class="nx">rows</span><span class="p">[</span><span class="mf">0</span><span class="p">],</span><span class="w"> </span><span class="nx">items</span><span class="o">:</span><span class="w"> </span><span class="nx">items</span><span class="p">.</span><span class="nx">rows</span><span class="w"> </span><span class="p">};</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">25</span><span class="code"><span class="pfx">a</span><span class="p">}</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">26</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">27</span><span class="code"><span class="pfx">a</span><span class="nx">module</span><span class="p">.</span><span class="nx">exports</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">createOrder</span><span class="p">,</span><span class="w"> </span><span class="nx">getOrder</span><span class="w"> </span><span class="p">};</span>
+</span></div></div></details></div>
+<div class="next-wrap"><button class="next" data-next="4">Next concept &#8595;</button></div>
+</article>
+<article class="concept" id="concept-4" data-index="4">
+<div class="c-head"><div class="c-num">4</div><div class="c-titles">
+<h2>HTTP API</h2><div class="c-meta"><span class="chip sm">1 file</span><span class="chip sm"><span class="plus">+31</span><span class="sep"> </span><span class="minus">-0</span></span><span class="chip sm">1 hunk</span><span class="chip sm">builds on #3</span></div></div></div>
+<p class="intent"><span class="why">Why this exists</span>Exposes the domain as POST /orders and GET /orders/:id. Adds JSON body parsing, input validation (customerId + non-empty items), 201/400/404 semantics, and a JSON error handler so a thrown DB error becomes a 500 instead of a stack trace.</p>
+<div class="hunks"><details class="hunk"><summary><span class="caret">&#9654;</span><span class="badge mod">M</span><span class="fpath">b/src/server.js</span><span class="fcounts"><span class="plus">+31</span><span class="sep"> </span><span class="minus">-0</span></span></summary><div class="diff"><div class="dl dl-ctx"><span class="ln">1</span><span class="code"><span class="pfx">c</span>const express = require(&quot;express&quot;);</span></div>
+<div class="dl dl-add"><span class="ln">2</span><span class="code"><span class="pfx">a</span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">createOrder</span><span class="p">,</span><span class="w"> </span><span class="nx">getOrder</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s2">&quot;./orders&quot;</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-ctx"><span class="ln">3</span><span class="code"><span class="pfx">c</span></span></div>
+<div class="dl dl-ctx"><span class="ln">4</span><span class="code"><span class="pfx">c</span>const app = express();</span></div>
+<div class="dl dl-ctx"><span class="ln">5</span><span class="code"><span class="pfx">c</span>const PORT = process.env.PORT || 3000;</span></div>
+<div class="dl dl-ctx"><span class="ln">6</span><span class="code"><span class="pfx">c</span></span></div>
+<div class="dl dl-add"><span class="ln">7</span><span class="code"><span class="pfx">a</span><span class="nx">app</span><span class="p">.</span><span class="nx">use</span><span class="p">(</span><span class="nx">express</span><span class="p">.</span><span class="nx">json</span><span class="p">());</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">8</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-ctx"><span class="ln">9</span><span class="code"><span class="pfx">c</span>app.get(&quot;/health&quot;, (req, res) =&gt; {</span></div>
+<div class="dl dl-ctx"><span class="ln">10</span><span class="code"><span class="pfx">c</span>  res.json({ status: &quot;ok&quot; });</span></div>
+<div class="dl dl-ctx"><span class="ln">11</span><span class="code"><span class="pfx">c</span>});</span></div>
+<div class="dl dl-ctx"><span class="ln">12</span><span class="code"><span class="pfx">c</span></span></div>
+<div class="dl dl-add"><span class="ln">13</span><span class="code"><span class="pfx">a</span><span class="nx">app</span><span class="p">.</span><span class="nx">post</span><span class="p">(</span><span class="s2">&quot;/orders&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="p">(</span><span class="nx">req</span><span class="p">,</span><span class="w"> </span><span class="nx">res</span><span class="p">,</span><span class="w"> </span><span class="nx">next</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">14</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">15</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">customerId</span><span class="p">,</span><span class="w"> </span><span class="nx">items</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">req</span><span class="p">.</span><span class="nx">body</span><span class="p">;</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">16</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">customerId</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="nb">Array</span><span class="p">.</span><span class="nx">isArray</span><span class="p">(</span><span class="nx">items</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nx">items</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">17</span><span class="code"><span class="pfx">a</span><span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="nx">res</span><span class="p">.</span><span class="nx">status</span><span class="p">(</span><span class="mf">400</span><span class="p">).</span><span class="nx">json</span><span class="p">({</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;customerId and non-empty items required&quot;</span><span class="w"> </span><span class="p">});</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">18</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="p">}</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">19</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">order</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">createOrder</span><span class="p">(</span><span class="nx">customerId</span><span class="p">,</span><span class="w"> </span><span class="nx">items</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">20</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="nx">res</span><span class="p">.</span><span class="nx">status</span><span class="p">(</span><span class="mf">201</span><span class="p">).</span><span class="nx">json</span><span class="p">(</span><span class="nx">order</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">21</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">22</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="nx">next</span><span class="p">(</span><span class="nx">err</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">23</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="p">}</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">24</span><span class="code"><span class="pfx">a</span><span class="p">});</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">25</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">26</span><span class="code"><span class="pfx">a</span><span class="nx">app</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s2">&quot;/orders/:id&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="p">(</span><span class="nx">req</span><span class="p">,</span><span class="w"> </span><span class="nx">res</span><span class="p">,</span><span class="w"> </span><span class="nx">next</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">27</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">28</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">order</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">getOrder</span><span class="p">(</span><span class="nb">Number</span><span class="p">(</span><span class="nx">req</span><span class="p">.</span><span class="nx">params</span><span class="p">.</span><span class="nx">id</span><span class="p">));</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">29</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">order</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nx">res</span><span class="p">.</span><span class="nx">status</span><span class="p">(</span><span class="mf">404</span><span class="p">).</span><span class="nx">json</span><span class="p">({</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;order not found&quot;</span><span class="w"> </span><span class="p">});</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">30</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="nx">res</span><span class="p">.</span><span class="nx">json</span><span class="p">(</span><span class="nx">order</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">31</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">32</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="nx">next</span><span class="p">(</span><span class="nx">err</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">33</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="p">}</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">34</span><span class="code"><span class="pfx">a</span><span class="p">});</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">35</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">36</span><span class="code"><span class="pfx">a</span><span class="nx">app</span><span class="p">.</span><span class="nx">use</span><span class="p">((</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="nx">req</span><span class="p">,</span><span class="w"> </span><span class="nx">res</span><span class="p">,</span><span class="w"> </span><span class="nx">next</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">37</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="nx">err</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">38</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="nx">res</span><span class="p">.</span><span class="nx">status</span><span class="p">(</span><span class="mf">500</span><span class="p">).</span><span class="nx">json</span><span class="p">({</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;internal error&quot;</span><span class="w"> </span><span class="p">});</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">39</span><span class="code"><span class="pfx">a</span><span class="p">});</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">40</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-ctx"><span class="ln">41</span><span class="code"><span class="pfx">c</span>app.listen(PORT, () =&gt; {</span></div>
+<div class="dl dl-ctx"><span class="ln">42</span><span class="code"><span class="pfx">c</span>  console.log(`orders-service listening on :${PORT}`);</span></div>
+<div class="dl dl-ctx"><span class="ln">43</span><span class="code"><span class="pfx">c</span>});</span></div></div></details></div>
+<div class="next-wrap"><button class="next" data-next="5">Next concept &#8595;</button></div>
+</article>
+<article class="concept" id="concept-5" data-index="5">
+<div class="c-head"><div class="c-num">5</div><div class="c-titles">
+<h2>Domain test</h2><div class="c-meta"><span class="chip sm">1 file</span><span class="chip sm"><span class="plus">+14</span><span class="sep"> </span><span class="minus">-0</span></span><span class="chip sm">1 hunk</span><span class="chip sm">builds on #3</span></div></div></div>
+<p class="intent"><span class="why">Why this exists</span>First test: proves createOrder totals line items and that getOrder round-trips the stored items. Exercises the domain against a real database rather than mocking.</p>
+<div class="hunks"><details class="hunk"><summary><span class="caret">&#9654;</span><span class="badge add">A</span><span class="fpath">b/test/orders.test.js</span><span class="fcounts"><span class="plus">+14</span><span class="sep"> </span><span class="minus">-0</span></span></summary><div class="diff"><div class="dl dl-add"><span class="ln">1</span><span class="code"><span class="pfx">a</span><span class="kd">const</span><span class="w"> </span><span class="nx">test</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s2">&quot;node:test&quot;</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">2</span><span class="code"><span class="pfx">a</span><span class="kd">const</span><span class="w"> </span><span class="nx">assert</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s2">&quot;node:assert&quot;</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">3</span><span class="code"><span class="pfx">a</span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">createOrder</span><span class="p">,</span><span class="w"> </span><span class="nx">getOrder</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s2">&quot;../src/orders&quot;</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">4</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">5</span><span class="code"><span class="pfx">a</span><span class="nx">test</span><span class="p">(</span><span class="s2">&quot;createOrder stores items and totals the price&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">6</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">order</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">createOrder</span><span class="p">(</span><span class="mf">7</span><span class="p">,</span><span class="w"> </span><span class="p">[</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">7</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nx">sku</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;A-1&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">quantity</span><span class="o">:</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="nx">unitPriceCents</span><span class="o">:</span><span class="w"> </span><span class="mf">500</span><span class="w"> </span><span class="p">},</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">8</span><span class="code"><span class="pfx">a</span><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nx">sku</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;B-2&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">quantity</span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="nx">unitPriceCents</span><span class="o">:</span><span class="w"> </span><span class="mf">1500</span><span class="w"> </span><span class="p">},</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">9</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="p">]);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">10</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="nx">assert</span><span class="p">.</span><span class="nx">equal</span><span class="p">(</span><span class="nx">order</span><span class="p">.</span><span class="nx">total_cents</span><span class="p">,</span><span class="w"> </span><span class="mf">2500</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">11</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="nx">assert</span><span class="p">.</span><span class="nx">equal</span><span class="p">(</span><span class="nx">order</span><span class="p">.</span><span class="nx">items</span><span class="p">.</span><span class="nx">length</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">12</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">fetched</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">getOrder</span><span class="p">(</span><span class="nx">order</span><span class="p">.</span><span class="nx">id</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">13</span><span class="code"><span class="pfx">a</span><span class="w">  </span><span class="nx">assert</span><span class="p">.</span><span class="nx">equal</span><span class="p">(</span><span class="nx">fetched</span><span class="p">.</span><span class="nx">items</span><span class="p">.</span><span class="nx">length</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">);</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">14</span><span class="code"><span class="pfx">a</span><span class="p">});</span>
+</span></div></div></details></div>
+<div class="next-wrap"><button class="next" data-next="6">Next concept &#8595;</button></div>
+</article>
+<article class="concept" id="concept-6" data-index="6">
+<div class="c-head"><div class="c-num">6</div><div class="c-titles">
+<h2>Endpoint docs</h2><div class="c-meta"><span class="chip sm">1 file</span><span class="chip sm"><span class="plus">+11</span><span class="sep"> </span><span class="minus">-1</span></span><span class="chip sm">1 hunk</span><span class="chip sm">builds on #4</span></div></div></div>
+<p class="intent"><span class="why">Why this exists</span>README documents the three endpoints and the DATABASE_URL run requirement so the API is usable without reading source.</p>
+<div class="hunks"><details class="hunk"><summary><span class="caret">&#9654;</span><span class="badge mod">M</span><span class="fpath">b/README.md</span><span class="fcounts"><span class="plus">+11</span><span class="sep"> </span><span class="minus">-1</span></span></summary><div class="diff"><div class="dl dl-ctx"><span class="ln">1</span><span class="code"><span class="pfx">c</span># orders-service</span></div>
+<div class="dl dl-ctx"><span class="ln">2</span><span class="code"><span class="pfx">c</span></span></div>
+<div class="dl dl-del"><span class="ln">3</span><span class="code"><span class="pfx">d</span>Order placement service. Work in progress.
+</span></div>
+<div class="dl dl-add"><span class="ln">3</span><span class="code"><span class="pfx">a</span>Order placement service.
+</span></div>
+<div class="dl dl-add"><span class="ln">4</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">5</span><span class="code"><span class="pfx">a</span><span class="gu">## Endpoints</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">6</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">7</span><span class="code"><span class="pfx">a</span><span class="k">-</span><span class="w"> </span><span class="sb">`POST /orders`</span> - create an order from <span class="sb">`{ customerId, items: [{ sku, quantity, unitPriceCents }] }`</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">8</span><span class="code"><span class="pfx">a</span><span class="k">-</span><span class="w"> </span><span class="sb">`GET /orders/:id`</span> - fetch an order with its items
+</span></div>
+<div class="dl dl-add"><span class="ln">9</span><span class="code"><span class="pfx">a</span><span class="k">-</span><span class="w"> </span><span class="sb">`GET /health`</span> - liveness probe
+</span></div>
+<div class="dl dl-add"><span class="ln">10</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">11</span><span class="code"><span class="pfx">a</span><span class="gu">## Run</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">12</span><span class="code"><span class="pfx">a</span>
+</span></div>
+<div class="dl dl-add"><span class="ln">13</span><span class="code"><span class="pfx">a</span>Set <span class="sb">`DATABASE_URL`</span>, then <span class="sb">`npm start`</span>.
+</span></div></div></details></div>
+<div class="next-wrap"><button class="next" data-next="7">Next concept &#8595;</button></div>
+</article></main><footer>diff-intent-timeline &middot; single-file review page &middot; generated from chunks.json + concepts.json</footer>
+</div>
+<script>
+(function(){
+  var steps=[].slice.call(document.querySelectorAll('.step'));
+  var cards=[].slice.call(document.querySelectorAll('.concept'));
+  var cur=0;
+  function setActive(i){cur=i;steps.forEach(function(s){s.classList.toggle('active',+s.dataset.index===i)});}
+  function goto(i){if(i<0||i>=cards.length)return;var c=cards[i];c.querySelectorAll('details').forEach(function(d){d.open=true});
+    c.scrollIntoView({behavior:'smooth',block:'start'});setActive(i);}
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)setActive(+e.target.dataset.index)})},
+    {rootMargin:'-30% 0px -60% 0px'});
+  cards.forEach(function(c){io.observe(c)});
+  steps.forEach(function(s){s.addEventListener('click',function(){goto(+s.dataset.index)})});
+  document.querySelectorAll('.next').forEach(function(b){b.addEventListener('click',function(){goto(+b.dataset.next)})});
+  document.addEventListener('keydown',function(e){
+    if(e.target.closest('details,textarea,input,[contenteditable]'))return;
+    if(e.key==='j'||e.key==='ArrowDown'){e.preventDefault();goto(Math.min(cur+1,cards.length-1));}
+    if(e.key==='k'||e.key==='ArrowUp'){e.preventDefault();goto(Math.max(cur-1,0));}
+  });
+  var bar=document.getElementById('progress');
+  window.addEventListener('scroll',function(){var h=document.documentElement;
+    bar.style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';},{passive:true});
+  var btnAll=document.getElementById('expand-all');
+  btnAll.addEventListener('click',function(){
+    var all=[].slice.call(document.querySelectorAll('details.hunk'));
+    var anyClosed=all.some(function(d){return !d.open});
+    all.forEach(function(d){d.open=anyClosed});
+    btnAll.textContent=anyClosed?'Collapse all':'Expand all';
+  });
+  var btnTheme=document.getElementById('theme');
+  var root=document.documentElement,stored=null;
+  try{stored=localStorage.getItem('dit-theme')}catch(e){}
+  var theme=stored||(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  root.dataset.theme=theme;
+  btnTheme.textContent=theme==='dark'?'Light':'Dark';
+  btnTheme.addEventListener('click',function(){
+    theme=theme==='dark'?'light':'dark';root.dataset.theme=theme;
+    btnTheme.textContent=theme==='dark'?'Light':'Dark';
+    try{localStorage.setItem('dit-theme',theme)}catch(e){}
+  });
+})();
+</script></body></html>
