@@ -90,7 +90,7 @@ padding:2px 8px 10px}
 #steps{list-style:none;position:relative}
 #steps::before{content:"";position:absolute;left:18px;top:10px;bottom:0;width:2px;
 background:linear-gradient(var(--line),color-mix(in srgb,var(--line) 20%,transparent))}
-.step{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;
+.step{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;
 color:var(--ink);padding:7px 8px;border-radius:9px;cursor:pointer;position:relative}
 .step:hover{background:var(--panel)}
 .step.active{background:var(--panel);box-shadow:0 2px 8px rgba(0,0,0,.12)}
@@ -99,7 +99,7 @@ color:var(--muted);font:700 11px/18px ui-monospace,monospace;text-align:center;p
 .step.active .dot{background:var(--accent);border-color:var(--accent);color:#fff}
 .sname{font-size:13px;font-weight:600;line-height:1.35;padding-top:2px}
 .step.active .sname{color:var(--accent)}
-.sdep{display:block;font-size:10.5px;color:var(--muted);font-weight:500;margin-top:1px}
+.sdep{display:block;flex-basis:100%;font-size:10.5px;color:var(--muted);font-weight:500;margin-top:1px;margin-left:32px}
 main{flex:1;min-width:0}
 .overview{background:linear-gradient(135deg,var(--accent-soft),transparent 60%);border:1px solid var(--line);
 border-left:3px solid var(--accent);border-radius:14px;padding:20px 22px;margin-bottom:26px}
@@ -117,11 +117,11 @@ font:700 17px/38px ui-monospace,monospace;text-align:center;box-shadow:0 2px 8px
 color:var(--muted);font-weight:600}
 .chip.sm .plus{color:var(--add)} .chip.sm .minus{color:var(--del)}
 .chip.sm.chip-layer{background:var(--accent-soft);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
-.chip-risk{text-transform:uppercase;font-size:10px;letter-spacing:.05em}
-.chip-risk-low{background:var(--add-bg);color:var(--add)}
-.chip-risk-med{background:rgba(245,158,11,.12);color:#b45309}
-:root[data-theme=dark] .chip-risk-med{color:#fbbf24}
-.chip-risk-high{background:var(--del-bg);color:var(--del)}
+.chip.sm.chip-risk{text-transform:uppercase;font-size:10px;letter-spacing:.05em}
+.chip.sm.chip-risk-low{background:var(--add-bg);color:var(--add)}
+.chip.sm.chip-risk-med{background:rgba(245,158,11,.12);color:#b45309}
+:root[data-theme=dark] .chip.sm.chip-risk-med{color:#fbbf24}
+.chip.sm.chip-risk-high{background:var(--del-bg);color:var(--del)}
 .intent{margin:14px 22px 0;padding:12px 16px;background:var(--accent-soft);border-left:3px solid var(--accent);
 border-radius:0 10px 10px 0;font-size:14px;color:var(--ink);max-width:75ch}
 .intent .why{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);
@@ -215,7 +215,7 @@ footer{padding:30px;text-align:center;color:var(--muted);font-size:13px;border-t
 header.top{padding:12px 14px}
 #rail{position:static;width:auto;height:auto;max-height:none}#steps{display:flex;flex-wrap:wrap;gap:4px}
 #steps::before{display:none}.step{width:auto;min-height:44px;border:1px solid var(--line);background:var(--panel);
-padding:8px 14px;border-radius:999px}.dot{display:none}
+padding:8px 14px;border-radius:999px}.dot{display:none}.sdep{margin-left:0}
 button.fs,button.ctl,button.next{min-height:44px;padding:10px 16px}
 details.hunk summary{min-height:44px;padding:12px 14px}}
 @media (max-width:700px){.dl{grid-template-columns:2.5em minmax(0,1fr) 2.5em minmax(0,1fr)}}

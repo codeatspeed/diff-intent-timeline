@@ -40,7 +40,7 @@
 
 **Interfaces:**
 - Consumes: existing `concepts` list from `concepts.json` (each item: `id`, `name`, `intent`, `depends_on`, `chunks`).
-- Produces: helper `layer_label(layer)` → str (title-cased label or `""`); meta chip markup conventions used by Tasks 2–4: layer chip `<span class="chip sm chip-layer">schema</span>`, risk chip `<span class="chip sm chip-risk chip-risk-high">high</span>`.
+- Produces: meta chip markup conventions used by Tasks 2–4: layer chip `<span class="chip sm chip-layer">schema</span>`, risk chip `<span class="chip sm chip-risk chip-risk-high">high</span>`.
 
 - [ ] **Step 1: Write the failing checks** in `test/verify.py` (append before the final print; they must fail now):
 
@@ -91,15 +91,17 @@ Expected: `FAIL layer chip rendered`, `FAIL risk chip rendered`, `FAIL risk reas
             f'<span class="sname">{esc(conept["name"])}</span>{sdep}</button></li>')
 ```
 
+**Step 3 note — rail `sdep` placement:** `.step` is `display:flex` (row, no wrap), so without CSS the `sdep` span becomes a third flex item rendered BESIDE the name. It must sit UNDER the name: add `flex-wrap:wrap` to `.step` and `flex-basis:100%` to `.sdep` (plus `margin-left:32px` on desktop to align under the name after dot+gap; the `@media (max-width:900px)` block overrides `margin-left:0` since the dot is hidden there). Add these alongside the Step 4 rules in the CSS string.
+
 - [ ] **Step 4: Add the CSS** for chips (append to the CSS string, near `.chip.sm`):
 
 ```css
 .chip.sm.chip-layer{background:var(--accent-soft);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
-.chip-risk{text-transform:uppercase;font-size:10px;letter-spacing:.05em}
-.chip-risk-low{background:var(--add-bg);color:var(--add)}
-.chip-risk-med{background:rgba(245,158,11,.12);color:#b45309}
-:root[data-theme=dark] .chip-risk-med{color:#fbbf24}
-.chip-risk-high{background:var(--del-bg);color:var(--del)}
+.chip.sm.chip-risk{text-transform:uppercase;font-size:10px;letter-spacing:.05em}
+.chip.sm.chip-risk-low{background:var(--add-bg);color:var(--add)}
+.chip.sm.chip-risk-med{background:rgba(245,158,11,.12);color:#b45309}
+:root[data-theme=dark] .chip.sm.chip-risk-med{color:#fbbf24}
+.chip.sm.chip-risk-high{background:var(--del-bg);color:var(--del)}
 ```
 
 - [ ] **Step 5: Add the backward-compat check** (asserts the ORIGINAL fixture render — `t.html`, produced from `concepts.json` without new fields — shows no lens chips; this check passes both before and after implementation, so it guards regression, not TDD):
