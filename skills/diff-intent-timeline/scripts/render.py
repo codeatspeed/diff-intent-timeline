@@ -311,7 +311,7 @@ def main():
     orphans = [c for c in chunks if c["id"] not in assigned]
     if orphans:
         concepts = list(concepts) + [{
-            "id": len(concepts) + 1,
+            "id": max((c.get("id", 0) for c in concepts), default=0) + 1,
             "name": "Unassigned chunks",
             "intent": "[auto] Chunks not assigned to any concept by the agent. "
                       "Review these explicitly - they may reveal a missed concept.",
