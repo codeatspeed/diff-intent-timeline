@@ -208,6 +208,21 @@ check("orphan -> auto concept id=max+1 (6)",
 check("no duplicate concept ids", s2.count('id="concept-6"') == 1)
 check("orphan hunk still rendered", "README.md" in s2)
 
+# --- review-lens schema fields (optional, backward compatible) ---
+cl = json.loads((TMP / "concepts.json").read_text())
+cl["concepts"][0]["layer"] = "schema"
+cl["concepts"][0]["risk"] = "high"
+cl["concepts"][0]["risk_reason"] = "auth gate"
+(TMP / "cl.json").write_text(json.dumps(cl))
+r = run([sys.executable, str(SKILL / "scripts/render.py"), "--chunks", str(out / "chunks.json"),
+         "--concepts", str(TMP / "cl.json"), "--title", "lens", "--out", str(TMP / "tl.html")])
+s = (TMP / "tl.html").read_text()
+check("layer chip rendered", 'class="chip sm chip-layer">schema<' in s)
+check("risk chip rendered", "chip-risk-high" in s and "auth gate" in s)
+check("risk reason tooltip", 'title="auth gate"' in s)
+check("lens schema backward compatible",
+      'class="chip sm chip-layer">' not in (TMP / "t.html").read_text())
+
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"\n{len(fails)} failures / {len(check_names)} checks")
 sys.exit(1 if fails else 0)

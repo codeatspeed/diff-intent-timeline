@@ -116,6 +116,12 @@ font:700 17px/38px ui-monospace,monospace;text-align:center;box-shadow:0 2px 8px
 .chip.sm{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);
 color:var(--muted);font-weight:600}
 .chip.sm .plus{color:var(--add)} .chip.sm .minus{color:var(--del)}
+.chip.sm.chip-layer{background:var(--accent-soft);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
+.chip-risk{text-transform:uppercase;font-size:10px;letter-spacing:.05em}
+.chip-risk-low{background:var(--add-bg);color:var(--add)}
+.chip-risk-med{background:rgba(245,158,11,.12);color:#b45309}
+:root[data-theme=dark] .chip-risk-med{color:#fbbf24}
+.chip-risk-high{background:var(--del-bg);color:var(--del)}
 .intent{margin:14px 22px 0;padding:12px 16px;background:var(--accent-soft);border-left:3px solid var(--accent);
 border-radius:0 10px 10px 0;font-size:14px;color:var(--ink);max-width:75ch}
 .intent .why{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);
@@ -586,14 +592,28 @@ def main():
                  if chunks_in else '<p class="empty">No hunks in this concept.</p>')
         if missing:
             hunks += (f'<div class="intent">[warn] missing chunks: {esc(", ".join(missing))}</div>')
-        meta = (f'<span class="chip sm">{len(files)} file{"s" if len(files) != 1 else ""}</span>'
-                f'<span class="chip sm"><span class="plus">+{ca}</span>'
-                f'<span class="sep"> </span><span class="minus">-{cr}</span></span>'
-                f'<span class="chip sm">{len(chunks_in)} hunk{"s" if len(chunks_in) != 1 else ""}</span>'
-                f'<span class="chip sm">{esc(dep_txt)}</span>')
+        meta_parts = [
+            f'<span class="chip sm">{len(files)} file{"s" if len(files) != 1 else ""}</span>',
+            f'<span class="chip sm"><span class="plus">+{ca}</span>'
+            f'<span class="sep"> </span><span class="minus">-{cr}</span></span>',
+            f'<span class="chip sm">{len(chunks_in)} hunk{"s" if len(chunks_in) != 1 else ""}</span>',
+            f'<span class="chip sm">{esc(dep_txt)}</span>',
+        ]
+        layer = (conept.get("layer") or "").strip().lower()
+        if layer:
+            meta_parts.append(f'<span class="chip sm chip-layer">{esc(layer)}</span>')
+        risk = (conept.get("risk") or "").strip().lower()
+        if risk in ("low", "med", "high"):
+            reason = (conept.get("risk_reason") or "").strip()
+            title = f' title="{esc(reason)}"' if reason else ""
+            meta_parts.append(
+                f'<span class="chip sm chip-risk chip-risk-{risk}"{title}>{risk}</span>')
+        meta = "".join(meta_parts)
+        # rail step: layer under the name via the existing (unused) .sdep rule
+        sdep = f'<span class="sdep">{esc(layer)}</span>' if layer else ""
         rail_steps.append(
             f'<li><button class="step" data-index="{i}"><span class="dot">{n}</span>'
-            f'<span class="sname">{esc(conept["name"])}</span></button></li>')
+            f'<span class="sname">{esc(conept["name"])}</span>{sdep}</button></li>')
         is_last = i == len(concepts) - 1
         nw_cls = "next-wrap" + (" has-hunk" if chunks_in else "")
         next_btn = ("" if is_last else
