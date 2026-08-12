@@ -222,6 +222,8 @@ check("risk chip rendered", "chip-risk-high" in s and "auth gate" in s)
 check("risk reason tooltip", 'title="auth gate"' in s)
 check("lens schema backward compatible",
       'class="chip sm chip-layer">' not in (TMP / "t.html").read_text())
+check("top-risks callout lists high-risk concepts",
+      'class="risks"' in s and "auth gate" in s and "Schema" in s)
 
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"\n{len(fails)} failures / {len(check_names)} checks")

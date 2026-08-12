@@ -105,6 +105,18 @@ main{flex:1;min-width:0}
 border-left:3px solid var(--accent);border-radius:14px;padding:20px 22px;margin-bottom:26px}
 .overview h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
 .overview p{font-size:15px;color:var(--ink);max-width:75ch}
+.risks{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--del);
+border-radius:14px;padding:16px 20px;margin-bottom:26px}
+.risks h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--del);margin-bottom:10px}
+.risks ol{list-style:none}
+.risk-item a{display:flex;align-items:baseline;gap:10px;color:var(--ink);text-decoration:none;
+padding:5px 4px;border-radius:8px;font-size:14px}
+.risk-item a:hover{background:var(--panel2)}
+.risk-badge{flex:none;font:700 10px/1.6 ui-monospace,monospace;text-transform:uppercase;
+padding:2px 7px;border-radius:5px;background:var(--del-bg);color:var(--del)}
+.risk-item a[href*="concept"] .risk-badge{background:var(--del-bg)}
+.risk-why{color:var(--muted);font-size:12.5px}
+@media print{.risks{display:none}}
 .concept{background:var(--panel);border:1px solid var(--line);border-radius:16px;margin:0 0 30px;
 overflow:hidden;box-shadow:var(--shadow);scroll-margin-top:96px}
 .c-head{display:flex;gap:16px;padding:18px 22px 0;align-items:flex-start}
@@ -640,11 +652,28 @@ def main():
              f'<span class="chip"><b>{len(chunks)}</b> hunks</span>'
              f'<span class="chip"><b class="plus">+{total_add}</b> <b class="minus">-{total_del}</b></span>')
 
+    risky = [c for c in concepts
+             if (c.get("risk") or "").strip().lower() in ("high", "med")]
+    risks_html = ""
+    if risky:
+        items = []
+        for c in risky:
+            reason = (c.get("risk_reason") or "").strip()
+            rval = (c.get("risk") or "").strip().lower()
+            name = esc(c.get("name", f"Concept {c['id']}"))
+            items.append(
+                f'<li class="risk-item"><a href="#concept-{c["id"]}">'
+                f'<span class="risk-badge">{esc(rval)}</span>{name}'
+                + (f'<span class="risk-why">{esc(reason)}</span>' if reason else "")
+                + '</a></li>')
+        risks_html = (f'<section class="risks"><h2>Review first</h2>'
+                      f'<ol>{"".join(items)}</ol></section>')
+
     overview = ""
     if data.get("overview"):
         overview = (f'<section class="overview"><h2>Overview</h2><p>{esc(data["overview"])}</p></section>')
 
-    body_html = "<main>" + overview + "\n".join(body) + "</main>"
+    body_html = "<main>" + risks_html + overview + "\n".join(body) + "</main>"
     footer = ("<footer>diff-intent-timeline &middot; single-file review page"
               " &middot; generated from chunks.json + concepts.json</footer>")
 
