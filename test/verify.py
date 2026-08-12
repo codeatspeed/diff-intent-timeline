@@ -226,6 +226,7 @@ check("top-risks callout lists high-risk concepts",
       'class="risks"' in s and "auth gate" in s and "Schema" in s)
 check("dependency graph svg present",
       '<svg class="dag"' in s and "<marker" in s and "concept-2" in s)
+check("tour toggle present", 'id="tour-toggle"' in s)
 
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"\n{len(fails)} failures / {len(check_names)} checks")

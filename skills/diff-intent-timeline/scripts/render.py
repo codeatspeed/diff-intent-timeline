@@ -185,6 +185,23 @@ background:var(--panel);color:var(--ink);cursor:pointer}
 .fs-overlay .diff{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:12px;
 background:var(--panel2);font-size:14.5px}
 .fs-overlay .dl .ln{font-size:12px}
+/* tour mode: spotlight one concept at a time with a floating narration bar */
+button.ctl.tour-active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+body.tour-on .concept{opacity:.28;pointer-events:none;transition:opacity .25s}
+body.tour-on .concept.tour-current{opacity:1;pointer-events:auto;box-shadow:0 0 0 3px var(--accent)}
+.tour-bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:95;display:flex;
+align-items:center;gap:12px;max-width:min(760px,92vw);padding:10px 16px;border-radius:14px;
+border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 92%,transparent);
+backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.tour-count{font:700 11px/1 ui-monospace,monospace;color:var(--muted);white-space:nowrap}
+.tour-title{font:600 13.5px/1.3 "Inter Variable","Inter",sans-serif;white-space:nowrap;overflow:hidden;
+text-overflow:ellipsis;max-width:220px}
+.tour-intent{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
+white-space:nowrap;max-width:260px}
+.tour-bar button{font:600 12px/1 inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);
+background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap}
+.tour-bar button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.tour-bar button:disabled{opacity:.4;cursor:default}
 /* side-by-side diff: 4-column grid (old-ln | old-code | new-ln | new-code) */
 .diff{overflow-x:auto;border-top:1px solid var(--line);font-size:13.5px;line-height:1.5;
 scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 45%,transparent) transparent}
@@ -276,7 +293,8 @@ JS = """
   var reduceMotion=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   function setActive(i){cur=i;steps.forEach(function(s){s.classList.toggle('active',+s.dataset.index===i)});}
   function goto(i){if(i<0||i>=cards.length)return;var c=cards[i];c.querySelectorAll('details').forEach(function(d){d.open=true});
-    c.scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'});setActive(i);}
+    c.scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'});setActive(i);
+    if(tourOn){tourI=i;tourUpdate();}}
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)setActive(+e.target.dataset.index)})},
     {rootMargin:'-30% 0px -60% 0px'});
   cards.forEach(function(c){io.observe(c)});
@@ -289,6 +307,8 @@ JS = """
       else if(e.key==='Tab'){e.preventDefault();if(fsOverlay)fsOverlay.querySelector('.fs-close').focus();}
       return;
     }
+    if(tourOn){if(e.key==='j'||e.key==='ArrowDown'){e.preventDefault();tourGo(tourI+1);return;}
+      if(e.key==='k'||e.key==='ArrowUp'){e.preventDefault();tourGo(tourI-1);return;}}
     if(e.target.closest('details,textarea,input,[contenteditable]'))return;
     if(e.key==='j'||e.key==='ArrowDown'){e.preventDefault();goto(Math.min(cur+1,cards.length-1));}
     if(e.key==='k'||e.key==='ArrowUp'){e.preventDefault();goto(Math.max(cur-1,0));}
@@ -330,6 +350,55 @@ JS = """
       e.preventDefault();e.stopPropagation();fsShow(h);
     });
   });
+  // tour mode: spotlight one concept at a time with a floating narration bar
+  var tourOn=false,tourI=0,tourBar=null;
+  function tourCur(){return tourI<cards.length?cards[tourI]:null}
+  function tourUpdate(){
+    if(!tourBar)return;
+    var c=tourCur();
+    cards.forEach(function(x){x.classList.toggle('tour-current',x===c)});
+    var prev=tourBar.querySelector('.tour-prev'),next=tourBar.querySelector('.tour-next');
+    prev.disabled=tourI<=0;next.disabled=tourI>=cards.length-1;
+    if(c){
+      tourBar.querySelector('.tour-count').textContent=(tourI+1)+' / '+cards.length;
+      var h=c.querySelector('h2');
+      tourBar.querySelector('.tour-title').textContent=h?h.textContent:'';
+      var it=c.querySelector('.intent');
+      tourBar.querySelector('.tour-intent').textContent=it?it.textContent.replace(/^Why this exists/,'').trim():'';
+    }
+  }
+  function tourGo(i){
+    if(!tourOn)return;
+    tourI=Math.max(0,Math.min(cards.length-1,i));
+    goto(tourI);
+    tourUpdate();
+  }
+  function tourBuild(){
+    if(tourBar)return;
+    tourBar=document.createElement('div');
+    tourBar.className='tour-bar';
+    tourBar.innerHTML='<button class="tour-prev" type="button">&#8592;</button>'
+      +'<span class="tour-count"></span>'
+      +'<span class="tour-title"></span><span class="tour-intent"></span>'
+      +'<button class="tour-next" type="button">&#8594;</button>'
+      +'<button class="tour-close" type="button">End tour</button>';
+    tourBar.querySelector('.tour-prev').addEventListener('click',function(){tourGo(tourI-1)});
+    tourBar.querySelector('.tour-next').addEventListener('click',function(){tourGo(tourI+1)});
+    tourBar.querySelector('.tour-close').addEventListener('click',tourOff);
+    document.body.appendChild(tourBar);
+  }
+  function tourOn_(){tourBuild();tourOn=true;document.body.classList.add('tour-on');tourGo(0);}
+  function tourOff(){tourOn=false;document.body.classList.remove('tour-on');
+    cards.forEach(function(x){x.classList.remove('tour-current')});
+    if(tourBar){tourBar.remove();tourBar=null;}
+    document.getElementById('tour-toggle').classList.remove('tour-active');
+    document.getElementById('tour-toggle').textContent='Tour';}
+  var btnTour=document.createElement('button');
+  btnTour.id="tour-toggle";btnTour.className='ctl';btnTour.type='button';btnTour.textContent='Tour';
+  btnTour.addEventListener('click',function(){
+    if(tourOn){tourOff();}else{tourOn_();this.classList.add('tour-active');this.textContent='End tour';}
+  });
+  document.querySelector('.chips').appendChild(btnTour);
   var bar=document.getElementById('progress');
   window.addEventListener('scroll',function(){var h=document.documentElement;
     bar.style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';},{passive:true});
