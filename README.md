@@ -10,6 +10,7 @@ Works on any input a diff can come from:
 
 - a PR branch (`--base origin/main --head feature-x`)
 - a single commit that has everything in it (`--commit <sha>`)
+- **any public pull request, even from another repo** (`--pr https://github.com/owner/repo/pull/123` — the diff is fetched over the network; no local clone or git needed). Private repos work too: set `GH_TOKEN`/`GITHUB_TOKEN` (e.g. `gh auth token`) or `GITLAB_TOKEN`, or embed the token in the URL. The fetch never uses git/SSH credentials.
 - a raw unified diff file (`--diff-file changes.diff`) — no git repo needed
 
 **Output = one `.html` file.** No server, no network, no dependencies beyond
@@ -96,7 +97,8 @@ consumer.
 
 - **Python 3.9+** — the scripts are stdlib-only.
 - **git CLI** — needed only for `--repo` / `--base` / `--commit` modes.
-  `--diff-file` mode reads any unified diff and works without git.
+  `--diff-file` reads any unified diff without git; `--pr` fetches the diff over the
+  network and needs neither git nor a local clone (public repos).
 - **pygments** *(optional)* — syntax highlighting inside the diff. Without it
   the page renders with plain add/remove/context coloring.
 - **node** *(optional)* — used only by `test/verify.py` for the inline-JS

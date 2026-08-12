@@ -11,6 +11,15 @@ Take ONE diff (a PR branch, a single commit, or a raw unified diff) and turn it 
 
 Three ordered steps. All scripts are Python 3 stdlib; `pygments` is optional (syntax highlighting).
 
+**Before you start — check dependencies, and tell the user if any are missing.**
+`python3` is required; `git` is required only for `--repo`/`--base`/`--commit` modes
+(not for `--pr` or `--diff-file`); `pygments` is optional — without it the page renders
+plain add/remove/context colors. Run `python3 --version`, `git --version` (when needed),
+and `python3 -c "import pygments"` to check. If a **required** dependency is missing,
+tell the user and stop (blocked) rather than starting a run that fails halfway. If only
+`pygments` is missing, warn that highlighting will be off and proceed — the pipeline is
+fully functional without it.
+
 ### Step 1 — Prepare: split the diff into chunks
 
 ```bash
@@ -22,7 +31,20 @@ python3 scripts/prepare_diff.py --repo <path> --commit <sha>
 
 # Any unified diff (no git needed)
 python3 scripts/prepare_diff.py --diff-file changes.diff
+
+# Any public pull request (fetched over the network; needs no local clone or git)
+python3 scripts/prepare_diff.py --pr https://github.com/owner/repo/pull/123
 ```
+
+GitHub and GitLab PR pages serve their unified diff at `<url>.diff`, so a PR from
+*any* repo works — it doesn't have to be the repo you're standing in. The fetched
+diff is the only networked step; the rendered page stays fully offline.
+
+**Private repos:** the fetch is a plain HTTP GET and does **not** use git
+credentials or SSH keys — without a token, GitHub answers 404 (private content is
+hidden even when the URL is valid). For private PRs set `GH_TOKEN`/`GITHUB_TOKEN`
+(exported from `gh auth token`) or `GITLAB_TOKEN`, or embed the token in the URL:
+`https://<TOKEN>@github.com/owner/repo/pull/123`.
 
 Writes `chunks.json` (one object per hunk: id, file, status, language, line ranges, +/- counts, raw content, truncated flag) and `summary.json` (files, totals, languages, skipped binaries) into `--out DIR` (default: a per-run **work dir** under `~/.cache/diff-intent-timeline/` — never the target repo; these are pipeline intermediates). Flags: `--context N` (default 3), `--max-chunk-bytes` (default 6000). The script prints the work dir path — remember it for steps 2–3.
 
@@ -69,7 +91,7 @@ python3 scripts/render.py --chunks <workdir>/chunks.json --concepts <workdir>/co
 
 Flags: `--subtitle "..."`, `--no-highlight`, `--out <path>` (the HTML defaults to `timeline.html` next to `--chunks`, i.e. the work dir — leave it there; copy it into the repo only if the user wants the preview committed). Unassigned chunks are auto-appended as a final "Unassigned chunks" concept with a warning — a safety net, not a workflow; assign deliberately in step 2.
 
-**Done when:** the HTML opens cleanly from disk (`file://`) with no console errors — the rail highlights as you scroll, expand/collapse works, j/k navigates.
+**Done when:** `timeline.html` is written and contains one `class="concept"` card per concept you authored (spot-check the count with a grep). The renderer is deterministic — same inputs produce the same HTML — so there is nothing to re-verify in a browser per run; renderer behavior is covered by the skill's own `test/verify.py`. Opening the file is for the user to review, not a completion step.
 
 ## Pitfalls
 

@@ -6,6 +6,7 @@ Part of the diff-intent-timeline skill (see SKILL.md).
 Input modes (choose one):
   --repo PATH --base REF [--head REF]   git diff base..worktree (or base..head)
   --repo PATH --commit SHA              diff of a single commit
+  --pr URL                              fetch a pull-request diff over the network
   --diff-file PATH                      any unified diff file
 
 Output: chunks.json + summary.json in --out dir (default: cwd).
@@ -19,6 +20,8 @@ import os
 import re
 import subprocess
 import sys
+import urllib.parse
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -57,7 +60,60 @@ def run(cmd, cwd=None):
     return p.stdout
 
 
+PR_RE = re.compile(r"^(https?://[^/]+)/([^/]+)/([^/]+)/pull/(\d+)/?$")
+PR_DIFF_RE = re.compile(r"^(https?://[^/]+)/([^/]+)/([^/]+)/pull/(\d+)\.diff$")
+
+
+def pr_diff_url(url):
+    """Map a pull-request URL to its unified-diff URL, or None if it isn't one."""
+    if PR_DIFF_RE.match(url):
+        return url
+    m = PR_RE.match(url)
+    return url + ".diff" if m else None
+
+
+def auth_headers(url):
+    """Auth headers for private-repo fetches, read from env tokens.
+
+    The plain HTTP fetch never consults git credential helpers or SSH keys,
+    so private repos need an explicit token: GH_TOKEN/GITHUB_TOKEN for
+    GitHub, GITLAB_TOKEN/CI_JOB_TOKEN for GitLab. Alternatively embed the
+    token in the URL (https://<TOKEN>@github.com/...), which urllib turns
+    into Basic auth."""
+    host = (urllib.parse.urlsplit(url).netloc or "").lower()
+    if "github" in host:
+        tok = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+        if tok:
+            return {"Authorization": f"Bearer {tok}"}
+    elif "gitlab" in host:
+        tok = os.environ.get("GITLAB_TOKEN") or os.environ.get("CI_JOB_TOKEN")
+        if tok:
+            return {"PRIVATE-TOKEN": tok}
+    return {}
+
+
+def fetch_pr_diff(url):
+    """Fetch a PR's unified diff over the network. Public repos work with a
+    plain GET; private repos need a token (see auth_headers). The rendered
+    page stays self-contained/offline - only the input is fetched."""
+    diff_url = pr_diff_url(url)
+    if not diff_url:
+        sys.exit(f"not a pull-request URL: {url} "
+                 f"(expected https://<host>/<owner>/<repo>/pull/<N>)")
+    try:
+        req = urllib.request.Request(diff_url, headers=auth_headers(diff_url))
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return r.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        sys.exit(f"failed to fetch {diff_url}: {e}\n"
+                 f"  public repo: plain fetch works. Private repo: set "
+                 f"GH_TOKEN/GITHUB_TOKEN (or GITLAB_TOKEN), or embed the token "
+                 f"in the URL: https://<TOKEN>@github.com/owner/repo/pull/N")
+
+
 def get_diff(args):
+    if args.pr:
+        return fetch_pr_diff(args.pr)
     if args.diff_file:
         return Path(args.diff_file).read_text(encoding="utf-8", errors="replace")
     repo = args.repo or "."
@@ -71,7 +127,7 @@ def get_diff(args):
         if args.head:
             diff_args += [args.head]
     else:
-        sys.exit("need one of: --commit, --base (with optional --head), --diff-file")
+        sys.exit("need one of: --pr, --commit, --base (with optional --head), --diff-file")
     return run(diff_args)
 
 
@@ -96,6 +152,68 @@ def truncate_lines(lines, max_bytes):
     tail.reverse()
     marker = f"@@ ...TRUNCATED: {size} bytes in original hunk... @@"
     return head + [marker] + tail, True
+
+
+def parse_word_marks(word_diff_text):
+    """Parse `git diff --word-diff=plain` into per-hunk marker records.
+
+    word-diff=plain emits each changed line ONCE with inline markers
+    ([-deleted-] / {+added+}). Returns a list aligned with the normal
+    parse's chunks: each element is a list of (old_marked, new_marked)
+    tuples, or None when the text has no markers."""
+    hunk_records, cur = [], []
+    in_hunk = False
+    for raw in word_diff_text.splitlines():
+        line = raw.rstrip("\n")
+        if line.startswith("diff --git "):
+            in_hunk = False
+            continue
+        if line.startswith("@@"):
+            if cur:
+                hunk_records.append(cur)
+                cur = []
+            in_hunk = True
+            continue
+        if not in_hunk:
+            continue
+        if line.startswith(("---", "+++", "index", "new file", "deleted file",
+                            "similarity", "rename", "Binary", "GIT binary")):
+            continue
+        if "[-" in line or "{+" in line:
+            old_marked = re.sub(r"\{\+.*?\+\}", "", line)
+            new_marked = re.sub(r"\[-.*?-\]", "", line)
+            cur.append((old_marked, new_marked))
+    if cur:
+        hunk_records.append(cur)
+    return hunk_records or None
+
+
+def attach_word_marks(chunks, word_diff_text):
+    """Match git word-diff markers to the plain-diff content lines (by order:
+    records carry deletions on the old side, additions on the new side) and
+    store chunk['words'] = {line_index: marked_line}. Content-identical lines
+    without markers are left unmatched (render falls back to difflib)."""
+    records = parse_word_marks(word_diff_text)
+    if not records:
+        return
+    for chunk, recs in zip(chunks, records):
+        if not recs:
+            continue
+        lines = chunk["content"].split("\n")
+        del_idx = [i for i, l in enumerate(lines)
+                   if l.startswith("-") and not l.startswith("---")]
+        add_idx = [i for i, l in enumerate(lines)
+                   if l.startswith("+") and not l.startswith("+++")]
+        word_map, di, ai = {}, 0, 0
+        for old_marked, new_marked in recs:
+            if "[-" in old_marked and di < len(del_idx):
+                word_map[str(del_idx[di])] = old_marked
+                di += 1
+            if "{+" in new_marked and ai < len(add_idx):
+                word_map[str(add_idx[ai])] = new_marked
+                ai += 1
+        if word_map:
+            chunk["words"] = word_map
 
 
 def parse(diff_text, max_chunk_bytes):
@@ -187,6 +305,8 @@ def main():
     ap.add_argument("--head", help="head ref (default: working tree)")
     ap.add_argument("--commit", help="single commit sha to diff (parent..commit)")
     ap.add_argument("--diff-file", help="read a raw unified diff from this file")
+    ap.add_argument("--pr", help="pull-request URL to diff (fetched over the network; "
+                                 "e.g. https://github.com/owner/repo/pull/123)")
     ap.add_argument("--context", type=int, default=3, help="context lines (default 3)")
     ap.add_argument("--max-chunk-bytes", type=int, default=6000,
                     help="per-hunk content cap (default 6000)")
@@ -200,11 +320,34 @@ def main():
         sys.exit("no diff produced - check refs (empty repo? identical trees?)")
 
     chunks, files_out, skipped = parse(diff_text, args.max_chunk_bytes)
+    # word-level diff markers (GitHub-style intra-line highlights): git modes
+    # run a second `--word-diff=plain` pass; --diff-file/--pr input may itself
+    # carry markers, otherwise render falls back to difflib
+    word_text = diff_text if (args.diff_file or args.pr) else None
+    if word_text is None:
+        try:
+            wargs = ["git", "-C", args.repo or ".", "diff", "--no-color", "--no-ext-diff", "-M",
+                     "--word-diff=plain", f"-U{args.context}"]
+            if args.commit:
+                wargs = ["git", "-C", args.repo or ".", "show", "--format=", "--no-color",
+                         "--no-ext-diff", "-M", "--word-diff=plain", f"-U{args.context}", args.commit]
+            elif args.base:
+                wargs += [args.base]
+                if args.head:
+                    wargs += [args.head]
+            word_text = run(wargs)
+        except SystemExit:
+            word_text = None
+    attach_word_marks(chunks, word_text or "")
     if args.out:
         out = Path(args.out)
     else:
         cache = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
-        slug = os.path.basename(os.path.abspath(args.repo)) if args.repo else "diff"
+        if args.pr:
+            m = PR_RE.match(args.pr) or PR_DIFF_RE.match(args.pr)
+            slug = f"{m.group(2)}-{m.group(3)}" if m else "pr"
+        else:
+            slug = os.path.basename(os.path.abspath(args.repo)) if args.repo else "diff"
         out = cache / "diff-intent-timeline" / f"{slug}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     out.mkdir(parents=True, exist_ok=True)
 
@@ -215,7 +358,8 @@ def main():
     summary = {
         "source": {
             "repo": os.path.abspath(args.repo) if args.repo else ".",
-            "mode": ("commit " + args.commit) if args.commit
+            "mode": ("pr " + args.pr) if args.pr
+                    else ("commit " + args.commit) if args.commit
                     else ("base " + (args.base or "HEAD") + (".." + args.head if args.head else "..worktree")),
             "diff_file": args.diff_file,
         },

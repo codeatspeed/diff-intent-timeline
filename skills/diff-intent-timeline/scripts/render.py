@@ -10,11 +10,14 @@ Usage:
       [--title "..."] [--subtitle "..."] [--out timeline.html] [--no-highlight]
 
 Python 3 stdlib; syntax highlighting via pygments when installed (optional).
-Diffs render GitHub-style side-by-side (old | new). Light + dark themes with
-scoped pygments palettes ('friendly' for light, 'monokai' for dark).
+Diffs render GitHub-style side-by-side (old | new), with same-position
+replacement pairs aligned on one row. Light + dark themes with scoped
+pygments palettes ('friendly' for light, 'monokai' for dark).
 """
 
 import argparse
+import base64
+import difflib
 import html
 import json
 import re
@@ -22,6 +25,23 @@ import sys
 from pathlib import Path
 
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$")
+
+FONT_DIR = Path(__file__).resolve().parent.parent / "fonts"
+
+
+def embed_font(family, woff2_name, weight_range):
+    """Inline an OFL variable font as base64 @font-face (keeps the page
+    self-contained and offline). Returns '' if the file is missing."""
+    p = FONT_DIR / woff2_name
+    if not p.exists():
+        return ""
+    data = base64.b64encode(p.read_bytes()).decode()
+    return (f"@font-face{{font-family:'{family}';font-style:normal;font-weight:{weight_range};"
+            f"font-display:swap;src:url(data:font/woff2;base64,{data}) format('woff2')}}")
+
+
+FONT_FACE = (embed_font("Inter Variable", "inter-latin.woff2", "100 900") +
+             embed_font("JetBrains Mono Variable", "jbm-latin.woff2", "100 800"))
 
 STATUS_META = {
     "added": ("A", "add"), "modified": ("M", "mod"), "deleted": ("D", "del"),
@@ -35,20 +55,24 @@ CSS = """
 --rail:#f0efeb;--shadow:0 1px 2px rgba(20,19,16,.06)}
 :root[data-theme=dark]{--bg:#0e1013;--panel:#15181d;--panel2:#12151a;--ink:#eae8e5;
 --muted:#a8adb5;--line:#2a3038;--accent:#818cf8;--accent-soft:rgba(99,102,241,.15);
---add:#4ade80;--add-bg:rgba(74,222,128,.10);--del:#fda4af;--del-bg:rgba(248,113,113,.13);
+--add:#4ade80;--add-bg:rgba(74,222,128,.14);--del:#fda4af;--del-bg:rgba(248,113,113,.13);
 --hunk:#c4b5fd;--hunk-bg:rgba(139,92,246,.12);--code:#eae8e5;--rail:#111419;
 --shadow:0 1px 2px rgba(0,0,0,.4)}
 *{box-sizing:border-box;margin:0;padding:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+button:active{transform:translateY(1px)}
+details.hunk summary:focus-visible{outline-offset:-2px}
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",
-Roboto,"Inter","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
-code,kbd,.mono{font-family:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace}
+body{background:var(--bg);color:var(--ink);font:16px/1.6 "Inter Variable","Inter",-apple-system,
+BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+code,kbd,.mono{font-family:"JetBrains Mono Variable","JetBrains Mono",ui-monospace,"SF Mono",
+"Cascadia Code",Menlo,Consolas,monospace}
 #progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:60;transition:width .08s linear}
 header.top{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 88%,transparent);
 backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 32px}
 .top-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 h1{font-size:19px;font-weight:700;letter-spacing:-.01em}
-.subtitle{color:var(--muted);font-size:12.5px;margin-top:2px;max-width:760px;overflow:hidden;
+.subtitle{color:var(--muted);font-size:13px;margin-top:2px;max-width:760px;overflow:hidden;
 text-overflow:ellipsis;white-space:nowrap}
 .chips{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 .chip{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--panel);
@@ -59,29 +83,30 @@ button.ctl{font:600 12.5px/1 inherit;padding:6px 12px;border-radius:8px;border:1
 background:var(--panel);color:var(--ink);cursor:pointer}
 button.ctl:hover{border-color:var(--accent);color:var(--accent)}
 .layout{display:flex;gap:28px;margin:26px auto 0;padding:0 32px;width:100%}
-#rail{width:248px;flex:none;position:sticky;top:84px;align-self:flex-start;max-height:calc(100vh - 100px);
+#rail{width:248px;flex:none;position:sticky;top:84px;align-self:flex-start;height:calc(100vh - 104px);
 overflow:auto;background:var(--rail);border:1px solid var(--line);border-radius:14px;padding:14px 12px}
 .rail-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
 padding:2px 8px 10px}
 #steps{list-style:none;position:relative}
-#steps::before{content:"";position:absolute;left:18px;top:10px;bottom:10px;width:2px;background:var(--line)}
+#steps::before{content:"";position:absolute;left:18px;top:10px;bottom:0;width:2px;
+background:linear-gradient(var(--line),color-mix(in srgb,var(--line) 20%,transparent))}
 .step{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;
 color:var(--ink);padding:7px 8px;border-radius:9px;cursor:pointer;position:relative}
 .step:hover{background:var(--panel)}
-.step.active{background:var(--panel);box-shadow:var(--shadow)}
+.step.active{background:var(--panel);box-shadow:0 2px 8px rgba(0,0,0,.12)}
 .dot{flex:none;width:22px;height:22px;border-radius:50%;background:var(--panel);border:2px solid var(--line);
 color:var(--muted);font:700 11px/18px ui-monospace,monospace;text-align:center;position:relative;z-index:1}
 .step.active .dot{background:var(--accent);border-color:var(--accent);color:#fff}
-.sname{font-size:12.5px;font-weight:600;line-height:1.35;padding-top:2px}
+.sname{font-size:13px;font-weight:600;line-height:1.35;padding-top:2px}
 .step.active .sname{color:var(--accent)}
 .sdep{display:block;font-size:10.5px;color:var(--muted);font-weight:500;margin-top:1px}
 main{flex:1;min-width:0}
 .overview{background:linear-gradient(135deg,var(--accent-soft),transparent 60%);border:1px solid var(--line);
 border-left:3px solid var(--accent);border-radius:14px;padding:20px 22px;margin-bottom:26px}
 .overview h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
-.overview p{font-size:14.5px;color:var(--ink)}
+.overview p{font-size:15px;color:var(--ink);max-width:75ch}
 .concept{background:var(--panel);border:1px solid var(--line);border-radius:16px;margin:0 0 30px;
-overflow:hidden;box-shadow:var(--shadow)}
+overflow:hidden;box-shadow:var(--shadow);scroll-margin-top:96px}
 .c-head{display:flex;gap:16px;padding:18px 22px 0;align-items:flex-start}
 .c-num{flex:none;width:38px;height:38px;border-radius:11px;background:var(--accent);color:#fff;
 font:700 17px/38px ui-monospace,monospace;text-align:center;box-shadow:0 2px 8px rgba(79,70,229,.35)}
@@ -92,8 +117,8 @@ font:700 17px/38px ui-monospace,monospace;text-align:center;box-shadow:0 2px 8px
 color:var(--muted);font-weight:600}
 .chip.sm .plus{color:var(--add)} .chip.sm .minus{color:var(--del)}
 .intent{margin:14px 22px 0;padding:12px 16px;background:var(--accent-soft);border-left:3px solid var(--accent);
-border-radius:0 10px 10px 0;font-size:14px;color:var(--ink)}
-.intent .why{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);
+border-radius:0 10px 10px 0;font-size:14px;color:var(--ink);max-width:75ch}
+.intent .why{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);
 display:block;margin-bottom:3px}
 .hunks{padding:14px 22px 20px}
 details.hunk{border:1px solid var(--line);border-radius:10px;margin-top:10px;background:var(--panel2);
@@ -102,6 +127,8 @@ details.hunk[open]{box-shadow:var(--shadow)}
 details.hunk summary{display:flex;gap:10px;align-items:center;cursor:pointer;padding:9px 14px;
 list-style:none;user-select:none}
 details.hunk summary::-webkit-details-marker{display:none}
+details.hunk summary:hover{background:var(--panel)}
+details.hunk summary:hover .caret{color:var(--accent)}
 summary .caret{color:var(--muted);font-size:11px;transition:transform .15s;width:10px}
 details.hunk[open] summary .caret{transform:rotate(90deg)}
 .badge{flex:none;font:700 10px/1 ui-monospace,monospace;padding:3px 7px;border-radius:5px}
@@ -123,13 +150,17 @@ padding:18px 32px 24px}
 .fs-head{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line);
 margin-bottom:14px;flex-wrap:wrap}
 .fs-head .fpath{font-size:14px}
-.fs-close{margin-left:auto;font:600 12px/1 inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);
+.fs-hint{margin-left:auto;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11.5px}
+kbd{font:600 10.5px/1.4 "JetBrains Mono Variable",ui-monospace,monospace;padding:2px 6px;border:1px solid var(--line);
+border-bottom-width:2px;border-radius:5px;background:var(--panel);color:var(--muted)}
+.fs-close{font:600 12px/1 inherit;min-height:34px;padding:7px 14px;border-radius:8px;border:1px solid var(--line);
 background:var(--panel);color:var(--ink);cursor:pointer}
 .fs-close:hover{border-color:var(--accent);color:var(--accent)}
 .fs-overlay .diff{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:12px;
-background:var(--panel2);font-size:14px}
+background:var(--panel2);font-size:14.5px}
+.fs-overlay .dl .ln{font-size:12px}
 /* side-by-side diff: 4-column grid (old-ln | old-code | new-ln | new-code) */
-.diff{overflow-x:auto;border-top:1px solid var(--line);font-size:13px;line-height:1.5;
+.diff{overflow-x:auto;border-top:1px solid var(--line);font-size:13.5px;line-height:1.5;
 scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 45%,transparent) transparent}
 /* styled webkit scrollbars are classic (always visible), not macOS overlay */
 .diff::-webkit-scrollbar{width:10px;height:10px}
@@ -139,33 +170,76 @@ border:2px solid transparent;background-clip:content-box}
 border:2px solid transparent;background-clip:content-box}
 .diff::-webkit-scrollbar-track{background:transparent}
 .dl{display:grid;grid-template-columns:4em minmax(0,1fr) 4em minmax(0,1fr);min-width:0}
-/* add-only hunks have an empty old pane; collapse it so code gets full width */
-.dl-own{grid-template-columns:0 0 4em minmax(0,1fr)}
+/* GitHub split view: a deleted+added pair at the same position aligns on one
+   row - red old half (left), green new half (right) */
+.dl-pair .ln:nth-child(1),.dl-pair .code:nth-child(2){background:var(--del-bg)}
+.dl-pair .ln:nth-child(3),.dl-pair .code:nth-child(4){background:var(--add-bg)}
+.dl-pair .code:nth-child(2){color:var(--del)}
+.dl-pair .code:nth-child(4){color:var(--add)}
+/* intra-line word diffs (GitHub-style): deleted words struck through on a
+   deeper red, added words on a deeper green */
+.w-del{background:color-mix(in srgb,var(--del) 24%,transparent);text-decoration:line-through;
+text-decoration-color:color-mix(in srgb,var(--del) 60%,transparent)}
+.w-add{background:color-mix(in srgb,var(--add) 28%,transparent)}
 .dl .ln{text-align:right;padding:0 10px;color:var(--muted);user-select:none;font-size:11px;
-background:inherit;border-right:1px solid var(--line);
+background:inherit;border-right:1px solid var(--line);font-variant-numeric:tabular-nums;
 position:sticky;left:0}
-.dl .ln:nth-child(3){left:auto}
+.dl .ln:nth-child(3){left:auto;border-left:1px solid var(--line);
+background:color-mix(in srgb,var(--line) 60%,transparent)}
 /* gutter must be opaque: content scrolls beneath the sticky old-ln column.
    light row tints are opaque hex; dark tints are translucent, so pin solid. */
 :root[data-theme=dark] .dl .ln{background:var(--panel2)}
-.dl .code{padding:0 12px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--code);font-family:inherit}
+.dl .code{padding:0 12px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--code);
+font-family:"JetBrains Mono Variable","JetBrains Mono",ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace}
 .dl-add{background:var(--add-bg)} .dl-add .code{color:var(--add)}
 .dl-del{background:var(--del-bg)} .dl-del .code{color:var(--del)}
 .dl-ctx .code{color:var(--muted)}
+:root:not([data-theme=dark]) .dl-ctx .code{color:var(--code)}
 .dl-hunk .code,.dl-nl .code{grid-column:1/-1;padding:2px 12px;font-weight:600}
 .dl-hunk{background:var(--hunk-bg)} .dl-hunk .code{color:var(--hunk)}
 .dl-nl .code{color:var(--muted);font-style:italic;font-weight:400}
 .next-wrap{display:flex;justify-content:flex-end;padding:0 22px 18px}
+.next-wrap.has-hunk{border-top:1px solid var(--line);margin-top:14px;padding-top:14px}
 button.next{font:600 12.5px/1 inherit;padding:8px 14px;border-radius:9px;border:1px solid var(--accent);
 background:var(--accent);color:#fff;cursor:pointer}
 button.next:hover{filter:brightness(1.1)}
-footer{padding:30px;text-align:center;color:var(--muted);font-size:13px}
+.hunks .empty{color:var(--muted);font-size:13px;padding:2px 2px 0}
+footer{padding:30px;text-align:center;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 @media (max-width:900px){.layout{flex-direction:column;padding:0 14px}
 header.top{padding:12px 14px}
-#rail{position:static;width:auto;max-height:none}#steps{display:flex;flex-wrap:wrap;gap:4px}
-#steps::before{display:none}.step{width:auto}.dot{display:none}}
-@media print{header.top,#rail,.next-wrap,button{display:none!important}.concept{break-inside:avoid;
+#rail{position:static;width:auto;height:auto;max-height:none}#steps{display:flex;flex-wrap:wrap;gap:4px}
+#steps::before{display:none}.step{width:auto;min-height:44px;border:1px solid var(--line);background:var(--panel);
+padding:8px 14px;border-radius:999px}.dot{display:none}
+button.fs,button.ctl,button.next{min-height:44px;padding:10px 16px}
+details.hunk summary{min-height:44px;padding:12px 14px}}
+@media (max-width:700px){.dl{grid-template-columns:2.5em minmax(0,1fr) 2.5em minmax(0,1fr)}}
+@media (max-width:480px){.chips{gap:6px}.chip{font-size:11px;padding:3px 8px}
+button.ctl{font-size:11.5px;padding:6px 10px}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}#progress,.caret{transition:none}}
+@media print{header.top,#rail,.next-wrap,button,.fs-overlay{display:none!important}.concept{break-inside:avoid;
 box-shadow:none}.layout{display:block;max-width:none;padding:0}}
+"""
+
+# light-theme syntax tokens: pygments "friendly" fails WCAG AA on 13.5px code
+# (comments ~2.9:1, numbers ~3.1:1, diff add/del markers ~3.3:1). GitHub-Light
+# values, all >= 4.5:1 on the pale tints. Dark keeps Monokai. Appended AFTER
+# pyg_css so equal-specificity rules win.
+LIGHT_TOKENS = """
+:root:not([data-theme=dark]) .diff .c,
+:root:not([data-theme=dark]) .diff .ch,
+:root:not([data-theme=dark]) .diff .cm,
+:root:not([data-theme=dark]) .diff .c1,
+:root:not([data-theme=dark]) .diff .cs,
+:root:not([data-theme=dark]) .diff .cpf{color:#5c6670;font-style:italic}
+:root:not([data-theme=dark]) .diff .m,
+:root:not([data-theme=dark]) .diff .mb,
+:root:not([data-theme=dark]) .diff .mf,
+:root:not([data-theme=dark]) .diff .mh,
+:root:not([data-theme=dark]) .diff .mi,
+:root:not([data-theme=dark]) .diff .mo,
+:root:not([data-theme=dark]) .diff .il{color:#0550ae}
+:root:not([data-theme=dark]) .diff .gi{color:#116329}
+:root:not([data-theme=dark]) .diff .gd{color:#82071e}
 """
 
 JS = """
@@ -173,9 +247,10 @@ JS = """
   var steps=[].slice.call(document.querySelectorAll('.step'));
   var cards=[].slice.call(document.querySelectorAll('.concept'));
   var cur=0;
+  var reduceMotion=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   function setActive(i){cur=i;steps.forEach(function(s){s.classList.toggle('active',+s.dataset.index===i)});}
   function goto(i){if(i<0||i>=cards.length)return;var c=cards[i];c.querySelectorAll('details').forEach(function(d){d.open=true});
-    c.scrollIntoView({behavior:'smooth',block:'start'});setActive(i);}
+    c.scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'});setActive(i);}
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)setActive(+e.target.dataset.index)})},
     {rootMargin:'-30% 0px -60% 0px'});
   cards.forEach(function(c){io.observe(c)});
@@ -185,6 +260,7 @@ JS = """
   document.addEventListener('keydown',function(e){
     if(fsOpen()){
       if(e.key==='Escape'){fsClose();e.preventDefault();}
+      else if(e.key==='Tab'){e.preventDefault();if(fsOverlay)fsOverlay.querySelector('.fs-close').focus();}
       return;
     }
     if(e.target.closest('details,textarea,input,[contenteditable]'))return;
@@ -192,15 +268,18 @@ JS = """
     if(e.key==='k'||e.key==='ArrowUp'){e.preventDefault();goto(Math.max(cur-1,0));}
   });
   // per-hunk fullscreen: covers the tab (overlay), not the browser
-  var fsOverlay=null;
+  var fsOverlay=null,fsTrigger=null;
   function fsOpen(){return !!fsOverlay&&fsOverlay.classList.contains('open')}
-  function fsClose(){if(fsOverlay)fsOverlay.classList.remove('open')}
+  function fsClose(){if(fsOverlay){fsOverlay.classList.remove('open');if(fsTrigger&&fsTrigger.focus)fsTrigger.focus();fsTrigger=null;}}
   function fsShow(hunk){
     if(!fsOverlay){
       fsOverlay=document.createElement('div');
       fsOverlay.className='fs-overlay';
+      fsOverlay.setAttribute('role','dialog');
+      fsOverlay.setAttribute('aria-modal','true');
       fsOverlay.innerHTML='<div class="fs-head"><span class="badge"></span><span class="fpath"></span>'
-        +'<span class="fcounts"></span><button class="fs-close" type="button">Close</button></div>';
+        +'<span class="fcounts"></span><span class="fs-hint"><kbd>Esc</kbd> close</span>'
+        +'<button class="fs-close" type="button">Close</button></div>';
       fsOverlay.querySelector('.fs-close').addEventListener('click',fsClose);
       document.body.appendChild(fsOverlay);
     }
@@ -209,12 +288,16 @@ JS = """
     var hb=head.querySelector('.badge');
     hb.className='badge '+badge.className.split(' ')[1];
     hb.textContent=badge.textContent;
-    head.querySelector('.fpath').textContent=hunk.querySelector('.fpath').textContent;
+    var fp=hunk.querySelector('.fpath').textContent;
+    head.querySelector('.fpath').textContent=fp;
     head.querySelector('.fcounts').innerHTML=hunk.querySelector('.fcounts').innerHTML;
     var old=fsOverlay.querySelector('.diff');
     if(old)old.remove();
     fsOverlay.appendChild(hunk.querySelector('.diff').cloneNode(true));
+    fsOverlay.setAttribute('aria-label','Fullscreen diff: '+fp);
+    fsTrigger=hunk.querySelector('.fs');
     fsOverlay.classList.add('open');
+    fsOverlay.querySelector('.fs-close').focus();
   }
   document.querySelectorAll('details.hunk').forEach(function(h){
     h.querySelector('.fs').addEventListener('click',function(e){
@@ -237,9 +320,11 @@ JS = """
   var theme=stored||(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
   root.dataset.theme=theme;
   btnTheme.textContent=theme==='dark'?'Light':'Dark';
+  btnTheme.setAttribute('aria-pressed',theme==='dark'?'true':'false');
   btnTheme.addEventListener('click',function(){
     theme=theme==='dark'?'light':'dark';root.dataset.theme=theme;
     btnTheme.textContent=theme==='dark'?'Light':'Dark';
+    btnTheme.setAttribute('aria-pressed',theme==='dark'?'true':'false');
     try{localStorage.setItem('dit-theme',theme)}catch(e){}
   });
 })();
@@ -265,7 +350,9 @@ def highlight(code, lang):
         from pygments.formatters import HtmlFormatter
         from pygments.lexers import get_lexer_by_name
         lexer = get_lexer_by_name(lang, stripall=False)
-        return _pyg_hl(code, lexer, HtmlFormatter(nowrap=True))
+        # HtmlFormatter(nowrap=True) appends a trailing \n to every fragment;
+        # strip it so highlighted cells/word-segments don't carry stray breaks
+        return _pyg_hl(code, lexer, HtmlFormatter(nowrap=True)).rstrip("\n")
     except Exception:
         return None
 
@@ -281,9 +368,62 @@ def scope_css(css, scope):
     return "\n".join(out)
 
 
+def word_diff(old, new, lang, want_hl):
+    """Intra-line word diff, GitHub-style: returns (old_html, new_html) with
+    changed words wrapped in w-del (old side) / w-add (new side) spans and
+    unchanged words kept (syntax-highlighted when available)."""
+    def tokens(s):
+        return [t for t in re.split(r"(\w+|\W+)", s) if t]
+    old_t, new_t = tokens(old), tokens(new)
+    ops = difflib.SequenceMatcher(None, old_t, new_t, autojunk=False).get_opcodes()
+    old_parts, new_parts = [], []
+    for tag, i1, i2, j1, j2 in ops:
+        if tag == "equal":
+            old_parts.append(("", "".join(old_t[i1:i2])))
+            new_parts.append(("", "".join(new_t[j1:j2])))
+        elif tag == "delete":
+            old_parts.append(("w-del", "".join(old_t[i1:i2])))
+        elif tag == "insert":
+            new_parts.append(("w-add", "".join(new_t[j1:j2])))
+        else:  # replace
+            old_parts.append(("w-del", "".join(old_t[i1:i2])))
+            new_parts.append(("w-add", "".join(new_t[j1:j2])))
+
+    def render(parts):
+        out = []
+        for wrap, text in parts:
+            seg = highlight(text, lang) if want_hl else None
+            seg = seg or esc(text)
+            out.append(f'<span class="{wrap}">{seg}</span>' if wrap else seg)
+        return "".join(out)
+
+    return render(old_parts), render(new_parts)
+
+
+def marked_to_html(marked, lang, want_hl):
+    """Render a git --word-diff marked line: [-del-] -> w-del, {+add+} -> w-add;
+    unchanged segments keep syntax highlighting when available."""
+    parts = re.split(r"(\[-(.*?)-]|\{\+(.*?)\+\})", marked)
+    out = []
+    for j in range(0, len(parts), 4):
+        plain = parts[j]
+        if plain:
+            seg = highlight(plain, lang) if want_hl else None
+            out.append(seg or esc(plain))
+        if j + 1 < len(parts) and parts[j + 1] is not None:
+            full = parts[j + 1]
+            is_del = full.startswith("[-")
+            content = parts[j + 2] if is_del else parts[j + 3]
+            seg = highlight(content, lang) if want_hl else None
+            out.append(f'<span class="{"w-del" if is_del else "w-add"}">'
+                       f'{seg or esc(content)}</span>')
+    return "".join(out)
+
+
 def render_hunk_rows(chunk, want_hl):
-    """Side-by-side rows: old | new. Context shows on both sides, deletions
-    only on the old side, additions only on the new side."""
+    """GitHub split-view rows: old | new. Context repeats on both sides;
+    a deleted run followed by an added run is a same-position replacement
+    and aligns as one row (red old half | green new half)."""
     rows = []
     lines = chunk.get("content", "").split("\n")
     m = HUNK_RE.match(lines[0]) if lines else None
@@ -291,7 +431,9 @@ def render_hunk_rows(chunk, want_hl):
     cells = []  # (cls, old_ln, new_ln, inner)
     if m:
         cells.append(("dl-hunk", "", "", esc(lines[0])))
-    for line in lines[1:]:
+    lang = chunk.get("language", "text")
+    words = chunk.get("words") or {}
+    for idx, line in enumerate(lines[1:], 1):
         if not line:
             continue
         if line.startswith("\\"):
@@ -313,25 +455,57 @@ def render_hunk_rows(chunk, want_hl):
             new_n += 1
         inner = esc(code)
         if cls in ("dl-add", "dl-del") and want_hl:
-            tokens = highlight(code, chunk.get("language", "text"))
+            tokens = highlight(code, lang)
             if tokens:
                 inner = tokens
-        cells.append((cls, old_ln, new_ln, inner))
-    content_cells = [c for c in cells if c[0] in ("dl-add", "dl-del", "dl-ctx")]
-    own = " dl-own" if content_cells and all(c[0] == "dl-add" for c in content_cells) else ""
+        cells.append((cls, old_ln, new_ln, inner, code, words.get(str(idx))))
     rows = []
-    for cls, old_ln, new_ln, inner in cells:
+    i, n = 0, len(cells)
+    while i < n:
+        cls, old_ln, new_ln, inner = cells[i][:4]
         if cls in ("dl-hunk", "dl-nl"):
             rows.append(f'<div class="dl {cls}"><span class="code">{inner}</span></div>')
-        elif cls == "dl-add":
-            rows.append(f'<div class="dl {cls}{own}"><span class="ln"></span><span class="code"></span>'
+            i += 1
+            continue
+        if cls == "dl-del" and i + 1 < n and cells[i + 1][0] == "dl-add":
+            # GitHub split view: a deleted run followed by an added run is a
+            # same-position replacement - align the pair row-by-row, red old
+            # half on the left, green new half on the right
+            j = i
+            while j < n and cells[j][0] == "dl-del":
+                j += 1
+            k = j
+            while k < n and cells[k][0] == "dl-add":
+                k += 1
+            dels, adds = cells[i:j], cells[j:k]
+            for t in range(max(len(dels), len(adds))):
+                d = dels[t] if t < len(dels) else None
+                a = adds[t] if t < len(adds) else None
+                if d and a:
+                    if d[5] and a[5]:
+                        old_html = marked_to_html(d[5], lang, want_hl)
+                        new_html = marked_to_html(a[5], lang, want_hl)
+                    else:
+                        old_html, new_html = word_diff(d[4], a[4], lang, want_hl)
+                else:
+                    old_html = d[3] if d else ""
+                    new_html = a[3] if a else ""
+                rows.append(f'<div class="dl dl-pair"><span class="ln">{d[1] if d else ""}</span>'
+                            f'<span class="code">{old_html}</span>'
+                            f'<span class="ln">{a[2] if a else ""}</span>'
+                            f'<span class="code">{new_html}</span></div>')
+            i = k
+            continue
+        if cls == "dl-add":
+            rows.append(f'<div class="dl {cls}"><span class="ln"></span><span class="code"></span>'
                         f'<span class="ln">{new_ln}</span><span class="code">{inner}</span></div>')
         elif cls == "dl-del":
-            rows.append(f'<div class="dl {cls}{own}"><span class="ln">{old_ln}</span><span class="code">{inner}</span>'
+            rows.append(f'<div class="dl {cls}"><span class="ln">{old_ln}</span><span class="code">{inner}</span>'
                         f'<span class="ln"></span><span class="code"></span></div>')
         else:
-            rows.append(f'<div class="dl {cls}{own}"><span class="ln">{old_ln}</span><span class="code">{inner}</span>'
+            rows.append(f'<div class="dl {cls}"><span class="ln">{old_ln}</span><span class="code">{inner}</span>'
                         f'<span class="ln">{new_ln}</span><span class="code">{inner}</span></div>')
+        i += 1
     return "\n".join(rows)
 
 
@@ -374,7 +548,7 @@ def main():
                                  ":root[data-theme=dark]"))
         except Exception:
             pyg_css = ""
-    css_block = CSS + ("\n" + pyg_css if pyg_css else "")
+    css_block = FONT_FACE + CSS + ("\n" + pyg_css if pyg_css else "") + LIGHT_TOKENS
 
     by_id = {c["id"]: c for c in chunks}
     assigned = set()
@@ -408,8 +582,8 @@ def main():
         deps = conept.get("depends_on") or []
         dep_txt = "builds on " + ", ".join(f"#{d}" for d in deps) if deps else "foundation"
         first_open = n == 1 and len(chunks_in) <= 4
-        hunks = "\n".join(
-            render_hunk(c, not args.no_highlight, open_=first_open) for c in chunks_in)
+        hunks = ("\n".join(render_hunk(c, not args.no_highlight, open_=first_open) for c in chunks_in)
+                 if chunks_in else '<p class="empty">No hunks in this concept.</p>')
         if missing:
             hunks += (f'<div class="intent">[warn] missing chunks: {esc(", ".join(missing))}</div>')
         meta = (f'<span class="chip sm">{len(files)} file{"s" if len(files) != 1 else ""}</span>'
@@ -421,8 +595,9 @@ def main():
             f'<li><button class="step" data-index="{i}"><span class="dot">{n}</span>'
             f'<span class="sname">{esc(conept["name"])}</span></button></li>')
         is_last = i == len(concepts) - 1
+        nw_cls = "next-wrap" + (" has-hunk" if chunks_in else "")
         next_btn = ("" if is_last else
-                    f'<div class="next-wrap"><button class="next" data-next="{i + 1}">'
+                    f'<div class="{nw_cls}"><button class="next" data-next="{i + 1}">'
                     f'Next concept &#8595;</button></div>')
         body.append(f'''<article class="concept" id="concept-{n}" data-index="{i}">
 <div class="c-head"><div class="c-num">{n}</div><div class="c-titles">

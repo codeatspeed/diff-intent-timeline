@@ -20,10 +20,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SKILL = ROOT / "skills" / "diff-intent-timeline"
 TMP = Path(tempfile.mkdtemp(prefix="hermes-verify-dit-"))
-fails = []
+fails, check_names = [], []
 
 
 def check(name, cond, detail=""):
+    check_names.append(name)
     print(("PASS " if cond else "FAIL ") + name + (f"  [{detail}]" if detail and not cond else ""))
     if not cond:
         fails.append(name)
@@ -113,6 +114,29 @@ check("prepare --diff-file exits 0", r.returncode == 0, r.stderr.strip()[:200])
 check("diff-file mode == commit mode",
       [c["id"] for c in json.loads((TMP / "df/chunks.json").read_text())] == ids)
 
+# --- pr url -> .diff mapping (offline; the suite never hits the network) ---
+r = run([sys.executable, "-c",
+         "import sys; sys.path.insert(0, %r); import prepare_diff as p;"
+         "print(p.pr_diff_url('https://github.com/a/b/pull/3'));"
+         "print(p.pr_diff_url('https://github.com/a/b/pull/3.diff'));"
+         "print(p.pr_diff_url('https://example.com/x'))" % str(SKILL / "scripts")])
+check("pr url -> .diff mapping",
+      r.stdout.strip().splitlines() == ["https://github.com/a/b/pull/3.diff",
+                                        "https://github.com/a/b/pull/3.diff",
+                                        "None"],
+      r.stdout.strip())
+r = run([sys.executable, "-c",
+         "import os,sys; sys.path.insert(0, %r); import prepare_diff as p;"
+         "os.environ['GH_TOKEN']='t';os.environ['GITLAB_TOKEN']='gl';"
+         "print(p.auth_headers('https://github.com/a/b/pull/3.diff'));"
+         "print(p.auth_headers('https://gitlab.com/a/b/pull/3.diff'));"
+         "print(p.auth_headers('https://github.com/a/b/pull/3.diff'))" % str(SKILL / "scripts")])
+check("pr auth headers from env",
+      r.stdout.strip().splitlines() == ["{'Authorization': 'Bearer t'}",
+                                        "{'PRIVATE-TOKEN': 'gl'}",
+                                        "{'Authorization': 'Bearer t'}"],
+      r.stdout.strip())
+
 # --- render: full concepts (mapped by FILE PATH, not diff order) ---
 by_file = {c["file"].lstrip("ab/"): c["id"] for c in chunks}
 concepts = {
@@ -185,5 +209,5 @@ check("no duplicate concept ids", s2.count('id="concept-6"') == 1)
 check("orphan hunk still rendered", "README.md" in s2)
 
 shutil.rmtree(TMP, ignore_errors=True)
-print(f"\n{len(fails)} failures / 24 checks")
+print(f"\n{len(fails)} failures / {len(check_names)} checks")
 sys.exit(1 if fails else 0)
