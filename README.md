@@ -92,6 +92,17 @@ consumer.
 | `scripts/prepare_diff.py` | git diff / commit / unified diff → `chunks.json` + `summary.json` (one chunk per hunk, rename-aware, binary-safe, truncation-safe) |
 | `scripts/render.py` | `chunks.json` + `concepts.json` → single-file HTML timeline |
 
+## Test
+
+Self-contained verification (generates its own throwaway git repo, runs the
+whole pipeline, checks HTML invariants). No network, no external deps beyond
+Python 3 (pygments + node used opportunistically):
+
+```bash
+python3 test/verify.py        # exit 0 = all green
+hermes verify --json          # same, via the hermes CLI (records evidence)
+```
+
 ## License
 
 MIT © 2026 codeatspeed

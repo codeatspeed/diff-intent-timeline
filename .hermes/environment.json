@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "recipe": {
+    "name": "diff-intent-timeline",
+    "kind": "python-skill",
+    "bootstrap": [],
+    "build": [],
+    "test": ["python3 test/verify.py"],
+    "start": null,
+    "port": null,
+    "readinessPath": "/",
+    "evidence": ["test/verify.py"]
+  },
+  "updatedAt": "2026-08-12T08:10:00Z"
+}
