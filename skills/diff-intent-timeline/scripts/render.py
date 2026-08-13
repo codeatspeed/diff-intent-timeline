@@ -669,7 +669,7 @@ def render_dag(concepts):
         x, y = pos[c["id"]]
         name = esc((c.get("name") or "")[:24])
         parts.append(
-            f'<a href="#concept-{c["id"]}"><g class="dag-node">'
+            f'<a href="#concept-{c["id"]}" title="{esc(c.get("name") or "")}"><g class="dag-node">'
             f'<rect x="{x}" y="{y}" width="{NW}" height="{NH}" rx="9"/>'
             f'<text x="{x + 14}" y="{y + NH / 2 + 4}" class="dag-num">{c["id"]}</text>'
             f'<text x="{x + 34}" y="{y + NH / 2 + 4}" class="dag-name">{name}</text>'
