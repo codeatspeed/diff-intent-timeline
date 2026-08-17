@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-test for the diff-intent-timeline skill.
+"""Self-test for the diff-review skill.
 
 Generates a throwaway git repo containing ONE multi-concept commit (schema,
 db layer, domain, API, tests, docs), then runs the full pipeline against it:
@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SKILL = ROOT / "skills" / "diff-intent-timeline"
+SKILL = ROOT / "skills" / "diff-review"
 TMP = Path(tempfile.mkdtemp(prefix="hermes-verify-dit-"))
 fails, check_names = [], []
 

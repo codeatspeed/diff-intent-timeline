@@ -1,5 +1,5 @@
 ---
-name: diff-intent-timeline
+name: diff-review
 description: Render git diffs as HTML intent-timeline review pages - hunks clustered into concepts, ordered foundation-first. Use when a large PR, commit, or raw diff needs intent-ordered review, or the user asks for a timeline by intent, concept clustering, or a diff explained as a story.
 ---
 
@@ -46,7 +46,7 @@ hidden even when the URL is valid). For private PRs set `GH_TOKEN`/`GITHUB_TOKEN
 (exported from `gh auth token`) or `GITLAB_TOKEN`, or embed the token in the URL:
 `https://<TOKEN>@github.com/owner/repo/pull/123`.
 
-Writes `chunks.json` (one object per hunk: id, file, status, language, line ranges, +/- counts, raw content, truncated flag) and `summary.json` (files, totals, languages, skipped binaries) into `--out DIR` (default: a per-run **work dir** under `~/.cache/diff-intent-timeline/` — never the target repo; these are pipeline intermediates). Flags: `--context N` (default 3), `--max-chunk-bytes` (default 6000). The script prints the work dir path — remember it for steps 2–3.
+Writes `chunks.json` (one object per hunk: id, file, status, language, line ranges, +/- counts, raw content, truncated flag) and `summary.json` (files, totals, languages, skipped binaries) into `--out DIR` (default: a per-run **work dir** under `~/.cache/diff-review/` — never the target repo; these are pipeline intermediates). Flags: `--context N` (default 3), `--max-chunk-bytes` (default 6000). The script prints the work dir path — remember it for steps 2–3.
 
 **Done when:** `chunks.json` covers every hunk and `summary.json` captures the totals. If `totals.chunks` is huge (>~250), split the diff by directory or file group and run the pipeline per part — don't cluster hundreds of hunks in one pass.
 

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "recipe": {
-    "name": "diff-intent-timeline",
+    "name": "diff-review",
     "kind": "python-skill",
     "bootstrap": [],
     "build": [],

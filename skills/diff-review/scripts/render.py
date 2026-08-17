@@ -3,7 +3,7 @@
 "timeline by intent" review page.  No network, no server: one self-contained
 .html you can open from disk or share.
 
-Part of the diff-intent-timeline skill (see SKILL.md).
+Part of the diff-review skill (see SKILL.md).
 
 Usage:
   python3 render.py --chunks chunks.json --concepts concepts.json \
@@ -814,7 +814,7 @@ def main():
 
     dag_html = render_dag(concepts)
     body_html = "<main>" + dag_html + risks_html + overview + "\n".join(body) + "</main>"
-    footer = ("<footer>diff-intent-timeline &middot; single-file review page"
+    footer = ("<footer>diff-review &middot; single-file review page"
               " &middot; generated from chunks.json + concepts.json</footer>")
 
     html_doc = ("""<!doctype html>

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """prepare_diff.py - extract a git diff into LLM-ready hunk chunks.
 
-Part of the diff-intent-timeline skill (see SKILL.md).
+Part of the diff-review skill (see SKILL.md).
 
 Input modes (choose one):
   --repo PATH --base REF [--head REF]   git diff base..worktree (or base..head)
@@ -311,7 +311,7 @@ def main():
     ap.add_argument("--max-chunk-bytes", type=int, default=6000,
                     help="per-hunk content cap (default 6000)")
     ap.add_argument("--out", default=None,
-                    help="output dir (default: per-run work dir under ~/.cache/diff-intent-timeline; "
+                    help="output dir (default: per-run work dir under ~/.cache/diff-review; "
                          "pass --out to write into the repo instead)")
     args = ap.parse_args()
 
@@ -348,7 +348,7 @@ def main():
             slug = f"{m.group(2)}-{m.group(3)}" if m else "pr"
         else:
             slug = os.path.basename(os.path.abspath(args.repo)) if args.repo else "diff"
-        out = cache / "diff-intent-timeline" / f"{slug}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        out = cache / "diff-review" / f"{slug}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     out.mkdir(parents=True, exist_ok=True)
 
     langs = {}

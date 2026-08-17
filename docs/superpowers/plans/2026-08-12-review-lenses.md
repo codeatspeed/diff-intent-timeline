@@ -26,8 +26,8 @@
 
 ## File Structure
 
-- `skills/diff-intent-timeline/scripts/render.py` — ALL renderer changes (CSS string, JS string, `main()` meta-chip emission, new `render_dag()` function, tour bar emission).
-- `skills/diff-intent-timeline/SKILL.md` — step 2 instructions: author `layer`/`risk` when confident (exact allowed values).
+- `skills/diff-review/scripts/render.py` — ALL renderer changes (CSS string, JS string, `main()` meta-chip emission, new `render_dag()` function, tour bar emission).
+- `skills/diff-review/SKILL.md` — step 2 instructions: author `layer`/`risk` when confident (exact allowed values).
 - `test/verify.py` — new checks (per task), no changes to existing checks.
 - `docs/preview.html` — regenerated at the end from the reconstructed fixture (which has NO new fields → proves backward compat).
 - No new files. `concepts.json` schema is documented in SKILL.md only (no separate schema file).
@@ -35,7 +35,7 @@
 ## Task 1: Optional schema fields → meta chips + layer in rail
 
 **Files:**
-- Modify: `skills/diff-intent-timeline/scripts/render.py` (meta emission in `main()`, rail step emission)
+- Modify: `skills/diff-review/scripts/render.py` (meta emission in `main()`, rail step emission)
 - Test: `test/verify.py`
 
 **Interfaces:**
@@ -119,14 +119,14 @@ Expected: all PASS (27 checks = 23 baseline + 4 new: layer chip, risk chip+reaso
 - [ ] **Step 7: Commit**
 
 ```bash
-git add skills/diff-intent-timeline/scripts/render.py test/verify.py
+git add skills/diff-review/scripts/render.py test/verify.py
 git commit -m "lens: optional layer/risk schema fields -> meta chips + rail sdep"
 ```
 
 ## Task 2: Top-risks callout + risk legend
 
 **Files:**
-- Modify: `skills/diff-intent-timeline/scripts/render.py` (overview section emission)
+- Modify: `skills/diff-review/scripts/render.py` (overview section emission)
 - Test: `test/verify.py`
 
 **Interfaces:**
@@ -193,7 +193,7 @@ git commit -am "lens: top-risks callout for high/med risk concepts"
 ## Task 3: Dependency graph (hand-rolled SVG DAG)
 
 **Files:**
-- Modify: `skills/diff-intent-timeline/scripts/render.py` (new `render_dag()` function + CSS + placement)
+- Modify: `skills/diff-review/scripts/render.py` (new `render_dag()` function + CSS + placement)
 - Test: `test/verify.py`
 
 **Interfaces:**
@@ -297,7 +297,7 @@ background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:
 
 ```bash
 python3 -c "
-import sys; sys.path.insert(0, 'skills/diff-intent-timeline/scripts')
+import sys; sys.path.insert(0, 'skills/diff-review/scripts')
 import render as R
 cs = [{'id':1,'name':'a','depends_on':[],'intent':''},
       {'id':2,'name':'b','depends_on':[1],'intent':''},
@@ -314,14 +314,14 @@ print('dag ok')"
 - [ ] **Step 7: Commit**
 
 ```bash
-git add skills/diff-intent-timeline/scripts/render.py test/verify.py
+git add skills/diff-review/scripts/render.py test/verify.py
 git commit -m "lens: clickable dependency DAG (hand-rolled SVG, stdlib only)"
 ```
 
 ## Task 4: Tour mode (spotlight + floating tour bar)
 
 **Files:**
-- Modify: `skills/diff-intent-timeline/scripts/render.py` (CSS string, JS string)
+- Modify: `skills/diff-review/scripts/render.py` (CSS string, JS string)
 - Test: `test/verify.py`
 
 **Interfaces:**
@@ -425,14 +425,14 @@ In `goto()`, add a tour sync line (so rail clicks and Next-concept buttons advan
 Open `docs/preview.html` (regenerated in Task 6) or a temp render; click `Tour`; assert: one `.tour-current`, others dimmed, bar shows `1 / N`, Next advances and scrolls, `j`/`k` advance, `End tour` restores. **Step 7: Commit**
 
 ```bash
-git add skills/diff-intent-timeline/scripts/render.py test/verify.py
+git add skills/diff-review/scripts/render.py test/verify.py
 git commit -m "lens: guided tour mode (spotlight + floating narration bar)"
 ```
 
 ## Task 5: SKILL.md authoring guidance + regenerate preview + final regression
 
 **Files:**
-- Modify: `skills/diff-intent-timeline/SKILL.md`, `docs/preview.html` (regenerated)
+- Modify: `skills/diff-review/SKILL.md`, `docs/preview.html` (regenerated)
 - Test: `test/verify.py`
 
 - [ ] **Step 1: SKILL.md** — in Step 2 (Cluster), after the `depends_on` sentence, add:
@@ -447,7 +447,7 @@ git commit -m "lens: guided tour mode (spotlight + floating narration bar)"
 - [ ] **Step 2: Regenerate the sample** (fixture has no lens fields — proves backward compat):
 
 ```bash
-python3 skills/diff-intent-timeline/scripts/render.py \
+python3 skills/diff-review/scripts/render.py \
   --chunks /tmp/dit-fixture-regen/chunks.json \
   --concepts /tmp/dit-fixture-regen/concepts.json \
   --title "orders-service: implement order placement flow" \
@@ -461,7 +461,7 @@ Run: `python3 test/verify.py` → all PASS (30 checks). Then in the browser: ope
 - [ ] **Step 4: Commit**
 
 ```bash
-git add skills/diff-intent-timeline/SKILL.md docs/preview.html
+git add skills/diff-review/SKILL.md docs/preview.html
 git commit -m "lens: document layer/risk authoring; regenerate sample (backward compatible)"
 ```
 

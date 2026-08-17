@@ -1,4 +1,4 @@
-# diff-intent-timeline
+# diff-review
 
 An AI skill that turns one big git diff into a **reviewable story**: hunks are
 clustered into *concepts*, concepts are ordered as a dependency-aware *timeline*,
@@ -34,21 +34,21 @@ other agents):
 
 ```bash
 # global install to all your agents
-npx skills add codeatspeed/diff-intent-timeline --skill diff-intent-timeline -g -y
+npx skills add codeatspeed/diff-review --skill diff-review -g -y
 
 # or just this one agent
-npx skills add codeatspeed/diff-intent-timeline --skill diff-intent-timeline -a opencode -y
+npx skills add codeatspeed/diff-review --skill diff-review -a opencode -y
 
 # project-local
-npx skills add codeatspeed/diff-intent-timeline --skill diff-intent-timeline -y
+npx skills add codeatspeed/diff-review --skill diff-review -y
 
 # install without installing - generate a prompt / start an agent
-npx skills use codeatspeed/diff-intent-timeline --skill diff-intent-timeline
+npx skills use codeatspeed/diff-review --skill diff-review
 ```
 
 ## Usage
 
-Any agent that has loaded the skill runs the 3-step pipeline. All intermediates (chunks, concepts, summary) and the final HTML land in a per-run **work dir** under `~/.cache/diff-intent-timeline/` — never inside the repo being analyzed. Pass `--out` to override:
+Any agent that has loaded the skill runs the 3-step pipeline. All intermediates (chunks, concepts, summary) and the final HTML land in a per-run **work dir** under `~/.cache/diff-review/` — never inside the repo being analyzed. Pass `--out` to override:
 
 ```bash
 # 1. split the diff into chunks (JSON) — prints the work dir path
